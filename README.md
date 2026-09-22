@@ -1,6 +1,6 @@
 # ai-skill
 
-Twelve agent skills built around one rule: say the true thing, in the user's own situation, without
+Twenty nine agent skills built around one rule: say the true thing, in the user's own situation, without
 the accent of machine writing.
 
 They exist because of two failures that show up in almost every assistant. The first is flattery,
@@ -13,20 +13,63 @@ Works in [Kiro](https://kiro.dev/docs/skills.md) and in any tool that reads the 
 
 ## The skills
 
+Twenty nine of them, in four groups.
+
+### Running the work
+
 | Skill | What it does |
 |---|---|
-| [reality-check](skills/reality-check/) | Names the answer every other user got, bans it, then judges your idea against your own non-transferable advantages. Ends in BUILD, PIVOT or KILL with kill criteria. |
-| [human-prose](skills/human-prose/) | Removes the stylistic residue of machine writing, then verifies with a working 23 rule detector rather than a vibe. |
+| [build-pilot](skills/build-pilot/) | The whole build as seven staged phases: think, research, argue with itself, decide, plan, implement, verify. Gates where your input is needed. Writes no code before the deciding facts are verified. |
+| [arch-decide](skills/arch-decide/) | Classifies a decision by what reversal costs, spends effort in proportion, and writes the decision record. Refuses complexity your team size cannot operate. |
+| [release-manage](skills/release-manage/) | Separates deploying code from releasing behaviour, so a bad change is a toggle rather than an incident. |
+| [migration-plan](skills/migration-plan/) | Incremental migration with both systems running and every step reversible. No cutover weekend. |
+| [devex-tooling](skills/devex-tooling/) | One command from clean checkout to running, with pinned versions and a feedback loop short enough that nobody skips it. |
+
+### Building software
+
+| Skill | What it does |
+|---|---|
+| [frontend-build](skills/frontend-build/) | The five states most interfaces omit, state in the narrowest scope that works, accessibility during the build, bundle size budgeted in kilobytes. |
+| [backend-build](skills/backend-build/) | Object level authorisation, a stated concurrency assumption per write path, timeouts everywhere, idempotency before the retry arrives. |
+| [data-layer](skills/data-layer/) | Schemas, indexes read from the query plan, and migrations treated as production operations with a lock estimate. |
+| [mobile-build](skills/mobile-build/) | Offline behaviour decided before the screens, process death survived, store rejection causes covered. |
+| [ml-build](skills/ml-build/) | Evaluation set and trivial baseline before the model. Treats a good score as leakage until proven otherwise. |
+| [infra-deploy](skills/infra-deploy/) | Simplest hosting the requirements allow, rollback actually performed once, cost estimated from retrieved prices. |
+| [observability-setup](skills/observability-setup/) | Works back from the questions you need answered at 3am. Every alert has an owner and an action. |
+| [security-hardening](skills/security-hardening/) | Threat model first, findings ranked by reachability, advisories retrieved rather than recalled. |
+
+### Keeping it working
+
+| Skill | What it does |
+|---|---|
 | [ship-audit](skills/ship-audit/) | Eleven gate production readiness audit. Every finding names a file, a line, the trigger, and what is lost. |
-| [code-review](skills/code-review/) | Reviews a diff for defects that cost something. Ignores anything a linter owns. Reports a clean change as clean. |
+| [code-review](skills/code-review/) | Defects that cost something. Ignores anything a linter owns. Reports a clean change as clean. |
+| [test-strategy](skills/test-strategy/) | Effort allocated by what a failure costs. Says plainly that coverage percentage measures execution, not correctness. |
+| [debug-method](skills/debug-method/) | Reproduce, then one hypothesis at a time with a prediction that can be wrong. A symptom that stopped is not a fix. |
+| [performance-tuning](skills/performance-tuning/) | Profile first, fix the dominant cost, report before and after from the same method. |
+| [refactor-safely](skills/refactor-safely/) | Never mixes a refactor with a behaviour change. Safety net first, small reversible steps, suite green between each. |
+
+### Judgement and communication
+
+| Skill | What it does |
+|---|---|
+| [reality-check](skills/reality-check/) | Names the answer every other user got, bans it, then judges your idea against your own non-transferable advantages. BUILD, PIVOT or KILL with dated kill criteria. |
+| [human-prose](skills/human-prose/) | Removes the stylistic residue of machine writing, then verifies with a working 23 rule detector rather than a judgement call. |
 | [prompt-forge](skills/prompt-forge/) | Diagnoses which of six defects a prompt has and rewrites it. Refuses to invent a score out of ten. |
 | [deep-research](skills/deep-research/) | Graded sources, reported contradictions, and an explicit list of what could not be established. |
-| [numbers-check](skills/numbers-check/) | Recomputes with a script, carries units, cross-checks a second way, and names the assumption that decides the result. |
-| [business-model](skills/business-model/) | Contribution margin, the working capital cycle, break-even, payback. Models cash rather than only profit. |
-| [career-strategy](skills/career-strategy/) | Career advice priced in years and money, anchored in your financial position and rare skill combinations. |
-| [job-hunt](skills/job-hunt/) | Diagnoses which stage of the funnel is broken before rewriting anything. |
-| [finance-books](skills/finance-books/) | Bookkeeping, reconciliation, and statement checking. Stops at the line where a licensed accountant is required. |
+| [numbers-check](skills/numbers-check/) | Recomputes with a script, carries units, cross-checks a second way, names the assumption that decides the result. |
 | [doc-forge](skills/doc-forge/) | Documents chosen by what the reader does next, plus a zero dependency Markdown to print ready HTML and PDF converter. |
+| [business-model](skills/business-model/) | Contribution margin, the working capital cycle, break-even, payback. Models cash rather than only profit. |
+| [career-strategy](skills/career-strategy/) | Career decisions priced in years and money, anchored in your financial position and rare skill combinations. |
+| [job-hunt](skills/job-hunt/) | Diagnoses which stage of the funnel is broken before rewriting anything. |
+| [finance-books](skills/finance-books/) | Bookkeeping, reconciliation and statement checking. Stops at the line where a licensed accountant is required. |
+
+### How they chain
+
+`build-pilot` is the entry point for anything substantial. It calls the others in order: `deep-research`
+to verify the facts, `reality-check` to test the premise, `arch-decide` to record the choice, the build
+skills to implement, `test-strategy` and `code-review` while working, then `ship-audit` before release.
+Each one also works alone.
 
 ## Install
 
@@ -70,8 +113,10 @@ Each skill activates from its description when your request matches, or explicit
 named after the folder:
 
 ```
+/build-pilot build a booking system for a two person dental practice
 /reality-check I want to start a timber company with 30,000
 /ship-audit check the payments service before Friday
+/debug-method it works locally but 500s in production
 /human-prose clean up the launch post
 ```
 
