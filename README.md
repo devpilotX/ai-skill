@@ -48,11 +48,18 @@ cp -r ai-skill/skills/* ~/.kiro/skills/
 ```
 
 Kiro Web and Mobile do not read `~/.kiro/skills`. Use Settings, then Skills, and upload a skill as a
-zip. Per skill zips are attached to each [release](https://github.com/devpilotX/ai-skill/releases), or
-build them yourself:
+zip. There are three ways to get one:
 
 ```
 bash tools/build_dist.sh          # writes dist/<skill>.zip and dist/ai-skill-all.zip
+```
+
+Per skill zips are attached to each [release](https://github.com/devpilotX/ai-skill/releases) by the
+release workflow, alongside `SHA256SUMS.txt` for verification. The whole repository at a tag is also
+downloadable directly:
+
+```
+https://github.com/devpilotX/ai-skill/archive/refs/tags/v1.0.0.zip
 ```
 
 For Claude Code, copy a skill folder into `.claude/skills/`. The format is the same.
