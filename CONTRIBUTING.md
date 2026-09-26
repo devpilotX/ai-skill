@@ -3,12 +3,14 @@
 ## Before you open a pull request
 
 ```
+python3 tools/run_tests.py
 python3 tools/validate_skills.py
-python3 tests/test_ai_tells.py
-python3 tests/test_md2doc.py
+python3 tools/build_agents.py --check
 ```
 
-All three have to pass. CI runs the same commands, so a local failure is a guaranteed CI failure.
+All three have to pass. CI runs the same commands on Python 3.9, 3.12 and 3.14, so a local failure is a
+guaranteed CI failure. `tools/run_tests.py` runs every `tests/test_*.py`, so a new test file needs no
+other wiring.
 
 ## Layout of a skill
 
@@ -35,24 +37,34 @@ metadata:
 ---
 ```
 
+`metadata.version` is a semantic version, bumped whenever the skill's instructions change: patch for a
+correction, minor for new content, major when the skill's scope or output shape changes. The validator
+rejects anything that is not X.Y.Z.
+
 The description is the only thing loaded at startup, so it does the whole job of matching a request.
 Write it with the phrases a user would really use, including the awkward ones. A vague description means
 the skill never fires, which is the most common reason a skill appears not to work.
 
 ## What a good SKILL.md contains
 
-A short statement of the failure it corrects. Not a description of the topic.
+A short statement of the failure it corrects, as the opening paragraph. Not a description of the topic.
 
-An activation section, and an off switch. A skill that cannot be told to stop becomes nagging.
+`## When to use and when to stay off`: when it runs, when it stays off, which sibling skill takes
+overlapping requests, and an off switch sentence containing the word stop. A skill that cannot be told
+to stop becomes nagging.
 
-Non-negotiables, numbered, that override the rest of the file. Keep the list short, because a rule that
-gets ignored teaches that every rule is optional.
+`## Non-negotiables`, numbered, opening with "These override everything else in this file." Keep the
+list short, because a rule that gets ignored teaches that every rule is optional.
 
 A procedure in ordered steps, where a later step depends on an earlier one.
 
-A self-audit list at the end, written as checks that can fail.
+`## Self-audit`, written as checks that can fail.
 
-An honest statement of what the skill cannot do.
+`## What this cannot do`, an honest statement of limits, naming the licensed professional and the exact
+question to ask them where one is needed.
+
+The validator fails a SKILL.md that is missing any of the four headings, or whose activation section has
+no off switch.
 
 Push anything long into `references/`. The main file stays actionable.
 
@@ -102,9 +114,24 @@ Module docstring explaining the usage, a `main` function, and meaningful exit co
 
 If a script makes a claim, add a test for it under `tests/`.
 
+## Agents
+
+Agents live in `agents/src/<name>.md`, with frontmatter `name`, `description`, `skills` (comma separated)
+and `access` (`read-only` or `read-write`), and the system prompt as the body. Every listed skill must
+exist and be named in backticks in the prompt, with when to use it. Run `python3 tools/build_agents.py` to
+regenerate `agents/kiro/` and `agents/claude/`; never edit those by hand, because the check fails when
+they drift from the source.
+
+## Releases
+
+Add an entry under a new version in `CHANGELOG.md`, then tag `vX.Y.Z` on the default branch and push the
+tag. The release workflow runs the checks, builds reproducible zips from the tag, creates the release with
+the changelog section as notes, and attaches the zips and `SHA256SUMS.txt`. It fails if the changelog
+has no section for the tag.
+
 ## Adding a skill to the list
 
-Add a row to the table in the README. The validator checks that every skill appears there and that the
+Add a row to the table in the README, linking to `skills/<name>/`. The validator checks that every skill appears there and that the
 README does not reference a skill that was removed.
 
 ## Commit messages

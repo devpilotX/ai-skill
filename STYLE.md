@@ -16,8 +16,10 @@ copied.
 
 Read the caveat first, because it matters more than the rules: humans are bad at telling machine
 text from human text, and automated detectors have error rates high enough that Wikipedia tells
-editors not to rely on them. One 2025 study found untrained human judgement performed at about the
-level of chance. So these rules do not make text "undetectable" and this repository does not claim
+editors not to rely on them. Russell, Karpinska and Iyyer (2025,
+[arXiv 2501.15654](https://arxiv.org/abs/2501.15654)) found that annotators who rarely use language
+models performed close to chance at telling the two apart, while a majority vote of five frequent users
+misclassified only 1 of 300 articles. So these rules do not make text "undetectable" and this repository does not claim
 they do. They make text read better, which is a different and more achievable goal.
 
 ## Punctuation
@@ -145,8 +147,16 @@ Title Case headings, banned vocabulary over threshold, tracking parameters, know
 artifacts such as `oaicite` and `turn0search`, trailing whitespace, missing final newline, broken
 internal references, and any frontmatter that violates the skill specification.
 
-A file that has to enumerate banned words, such as this one, opts out of the vocabulary check with
-an HTML comment reading `lint-vocab-exempt` on the first line. Nothing else opts out of anything.
+The detector enforces an unambiguous subset of the vocabulary above, including inflections and
+British spellings. Words with a common literal sense in technical writing (leverage as a finance noun,
+landscape, navigate, unlock) are left to human review, because a rule that flags "unlock the mutex"
+gets switched off. The full rule list, with known false positives, is in
+`skills/human-prose/references/detector-rules.md`.
+
+A file that has to enumerate banned patterns, such as this one, opts out of named rules with an HTML
+comment reading `lint-exempt:` followed by the rule names, on one of its first twenty lines. The older
+`lint-vocab-exempt` marker exempts the two vocabulary rules. The token `all` never exempts leaked
+markup or placeholders. Every exemption is printed in the report, and nothing else opts out of anything.
 
 ## Honest limits
 

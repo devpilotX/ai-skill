@@ -1,53 +1,79 @@
 name: release
 
+# Pushing a tag such as v1.2.0 runs the checks on the Python floor and a current
+# version, builds the zips from the tagged commit, creates the release with the
+# matching CHANGELOG.md section as its notes if it does not exist yet, and attaches
+# the zips and checksums. workflow_dispatch rebuilds the assets for an existing tag.
+
 on:
-  release:
-    types: [published]
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to attach the zips to"
+        description: "Existing tag to rebuild and attach the zips to, such as v1.2.0"
         required: true
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  attach:
-    runs-on: ubuntu-latest
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.13"
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
 
       # Never publish an artifact that has not passed the checks.
-      - name: Detector tests
-        run: python3 tests/test_ai_tells.py
+      - run: python3 tools/run_tests.py
+      - run: python3 tools/validate_skills.py
+      - run: python3 tools/build_agents.py --check
 
-      - name: Converter tests
-        run: python3 tests/test_md2doc.py
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Validate skills
-        run: python3 tools/validate_skills.py
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Check the tag matches a CHANGELOG entry
+        run: python3 tools/release_notes.py "$TAG" > release-notes.md
 
       - name: Build zips
         run: bash tools/build_dist.sh
 
-      - name: Attach zips to the release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Create the release if needed and attach the assets
         run: |
-          tag="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
-          echo "attaching assets to $tag"
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-                 --title "$tag" --notes "Automated build for $tag."
-          gh release upload "$tag" dist/*.zip dist/SHA256SUMS.txt \
+          echo "publishing assets for $TAG"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "$TAG" --notes-file release-notes.md
+          fi
+          gh release upload "$TAG" dist/*.zip dist/SHA256SUMS.txt \
             --clobber --repo "$GITHUB_REPOSITORY"
-          echo "attached:"
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
             --jq '.assets[] | "  \(.name)  \(.size) bytes"'

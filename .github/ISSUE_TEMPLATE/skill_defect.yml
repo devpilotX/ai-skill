@@ -1,0 +1,31 @@
+name: Skill gives wrong or harmful advice
+description: A skill or agent states something false, outdated, unsourced, or likely to cause damage.
+labels: ["skill defect"]
+body:
+  - type: input
+    id: skill
+    attributes:
+      label: Skill or agent
+      description: Folder name, for example data-layer or risk-manager.
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: What it says
+      description: Quote the line and give the file path and line number.
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: What is correct, with a source
+      description: A link to documentation, a standard, a paper or a reproducible test.
+    validations:
+      required: true
+  - type: textarea
+    id: consequence
+    attributes:
+      label: What goes wrong if someone follows it
+    validations:
+      required: false
