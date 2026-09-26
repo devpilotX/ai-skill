@@ -1,150 +1,204 @@
 ---
 name: observability-setup
-description: Make a system diagnosable before it breaks, with logs, metrics, traces and alerts that someone will act on. Use when the user asks about logging, monitoring, metrics, tracing, alerting, dashboards, error tracking, uptime checks, service level objectives, or asks how to debug production, why they did not notice an outage, or why they get too many alerts. Starts from the questions that need answering during an incident and works back to the instrumentation, keeps every alert tied to a human action, puts a correlation identifier through every log line, and checks logs for leaked secrets and personal data. Triggers on set up logging, structured logs, monitoring, metrics, Prometheus, Grafana, OpenTelemetry, tracing, alerting, on call, SLO, error tracking, Sentry, dashboards, alert fatigue, why did we not notice.
+description: Make a system diagnosable before it breaks, with logs, metrics, traces, dashboards and alerts that someone will act on. Use when the user asks about logging, monitoring, metrics, tracing, alerting, dashboards, error tracking, uptime or synthetic checks, cron heartbeats, real user monitoring, crash reporting, SLOs, error budgets or burn rate alerts, or asks why they did not notice an outage, why they get too many alerts, or what they should alert on. Starts from the questions an incident needs answered, puts a trace ID through every log line, ties every alert to a human action, and audits logs for secrets and personal data. For debugging a live incident use debug-method instead. For rolling back a bad release use release-manage. Triggers on set up logging, logs are useless, structured logs, what should I alert on, alert fatigue, pager, on call, error budget, burn rate, SLO, Prometheus, Grafana, Loki, Datadog, CloudWatch, OpenTelemetry, Sentry, tracing, dashboards, why did we not notice.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Observability
 
-The purpose is answering questions at three in the morning with a system you cannot attach a debugger to.
-Start from the questions, not from the tools.
+The failure this corrects: a customer reports the outage before the team notices, and when the team
+looks, the logs cannot say which request failed, for whom, or what changed. That is the normal state of
+a setup built by installing tools and collecting everything. Here the work starts from the questions
+someone has to answer at three in the morning on a system they cannot attach a debugger to, and works
+back to the instrumentation.
 
-## The questions to design for
+## When to use and when to stay off
 
-Write these down first. The instrumentation follows from them.
+Run when the user is adding or fixing logging, metrics, tracing, dashboards, alerting, SLOs, uptime
+checks or crash reporting, or asks why an outage went unnoticed or why the pager is noisy.
 
-Is it broken right now, and for whom?
+Stay off, or hand over, when:
 
-When did it start, and what changed near that time?
+- A production incident is happening now and the user needs the cause. Use `debug-method`. Come back afterwards to close the gap that made it hard to diagnose.
+- The question is whether to roll back or how to stage a release. Use `release-manage`.
+- The request is provisioning the hosts, clusters or managed services the monitoring stack runs on. Use `infra-deploy`.
+- The user wants a whole release readiness verdict, where observability is one gate of many. Use `ship-audit`.
 
-Is it everyone or one customer, one region, one version?
-
-Which dependency is slow?
-
-What happened to this specific request that a user is complaining about?
-
-Is this getting worse or recovering?
-
-An observability setup that cannot answer these has volume without value, which is the normal state of
-an unplanned setup.
+Off switch: the user says "stop", "I've decided", or "just execute". Comply at once and stay off for
+the rest of the session unless asked again.
 
 ## Non-negotiables
 
-1. A correlation identifier generated at the edge, attached to every log line, propagated to every downstream call, and returned in error responses. Nothing else gives as much diagnostic value per unit of effort.
-2. Every alert names an action. An alert with no action gets muted, and muting one teaches people to mute the next. Alert fatigue is a design failure.
-3. Logs carry no secrets, tokens, card numbers or full personal records. Audit what is actually being written rather than assuming.
-4. Measure at a high percentile as well as an average. An average hides the slow requests that generate complaints.
-5. Errors go to an aggregator with a stack trace and context, not only to a file. An error log nobody opens is not monitoring.
-6. Every retention period is a decision with a cost attached, for logs, traces and metrics.
-7. Test the alerting path end to end. An alert that fires into a disconnected channel is worse than none, because it creates false confidence.
+These override everything else in this file.
+
+1. One trace ID per request, carried in the W3C `traceparent` header, written on every log line and returned in error responses.
+2. Every alert names an owner and an action. No action means no alert.
+3. No secrets, tokens, card numbers or full personal records in logs. Audit what is written, do not assume.
+4. Latency is reported from histograms at high percentiles. Never average percentiles across hosts.
+5. The alerting path, including the watchdog, is tested end to end to a human.
+6. Every retention period is a decision with a cost attached.
 
 ## Procedure
 
-### Step 1, structured logs
+Each step uses the output of the one before it. The long material (SLO worked example, burn rate
+pairs, alert template, cardinality rules, sampling, log audit queries) is in
+`references/alerts-and-slos.md`.
 
-Emit JSON, one object per event, with a consistent set of fields: timestamp, level, message, correlation
-identifier, and the identifiers relevant to the operation such as user, tenant, order. Unstructured text
-cannot be queried when it matters.
+### Step 1, write down the questions
 
-Log at boundaries: request received with method, path and identity; request completed with status and
-duration; outbound call with target, duration and outcome; background job start and finish; and every
-handled error with its cause.
+Is it broken right now, and for whom? When did it start, and what changed near that time? Is it
+everyone, or one customer, region or version? Which dependency is slow? What happened to the specific
+request a user is complaining about? Is it getting worse or recovering?
 
-Do not log inside tight loops, and do not log success for every trivial operation. Volume costs money and
-buries signal.
+Every later step exists to answer one of these. Instrumentation that answers none of them is cost.
 
-Use levels deliberately. Error means a human should look. Warn means it is recoverable but notable. Info
-is the operational narrative. Debug is off in production.
+### Step 2, structured logs with a trace ID
 
-Log the cause when handling an error. An error log without the original failure forces reproduction.
+Emit JSON, one object per event, with a fixed set of fields: timestamp, level, message, `trace_id`,
+`span_id`, and the identifiers relevant to the operation such as tenant or order.
 
-### Step 2, metrics
+Use the W3C Trace Context `traceparent` header ([W3C Trace Context](https://www.w3.org/TR/trace-context/))
+for propagation, and use its trace ID as the correlation ID. Do not invent a second request ID header
+that has to be kept in step with it. Generate a new trace at the public edge when there is no trusted
+inbound context, propagate it on every outbound call and queue message, and return the trace ID in error
+responses so a user report can be matched to the logs. The OpenTelemetry SDKs do this propagation by
+default.
 
-Four numbers cover most needs, per service: request rate, error rate, duration at the 95th and 99th
-percentiles, and saturation of whatever is scarce such as connection pool, queue depth or worker
-occupancy.
+Log at boundaries: request received and completed with status and duration, each outbound call with
+target, duration and outcome, background job start and finish, and every handled error with its cause.
+Do not log inside tight loops or log every trivial success.
 
-Add the one or two business events that indicate the product is working, such as orders placed or
-messages delivered. These detect failures that leave the infrastructure healthy, which is the most
-dangerous category.
+Levels mean something. Error means a human should look. Warn is recoverable but notable. Info is the
+operational narrative. Debug is off in production.
 
-Keep label cardinality under control. A label containing a user identifier or a raw path with identifiers
-in it will multiply series until the metrics system falls over. Use templated routes.
+### Step 3, metrics
 
-Counters and histograms over gauges where possible, since a gauge sampled between scrapes loses the
-spike.
+Per service: request rate, error rate, latency distribution, and saturation of whatever is scarce, such
+as connection pool in use, queue depth or worker occupancy. Add one or two business events that show
+the product works, such as orders placed or messages delivered, because those catch failures that leave
+the infrastructure looking healthy.
 
-### Step 3, traces
+Choose the type by what is measured. Counters for things that accumulate, such as requests and errors.
+Histograms for distributions, such as latency and payload size. Gauges for current levels, which is
+what most saturation signals are. A gauge is read at scrape time, so a spike that starts and ends
+between scrapes is invisible; the loss comes from the scrape interval, not from the type. Where short
+spikes matter, also export the maximum over the interval or a histogram of wait time, or scrape more
+often.
 
-Trace across service boundaries when there is more than one service, or when latency is distributed
-across external calls. For a single application, good logs with durations cover most of it.
+Percentiles cannot be averaged or summed. The mean of each host's p99 is not the fleet p99. Export
+histograms, aggregate the bucket counts across hosts, then compute the percentile from the aggregate.
+Client side summaries with precomputed quantiles cannot be aggregated at all.
 
-Use [OpenTelemetry](https://opentelemetry.io/docs/) so the instrumentation is not tied to one vendor.
+Keep label cardinality bounded. A label holding a user ID, request ID or raw path multiplies series
+until the backend slows down or the bill jumps. Use templated routes. Rules in
+`references/alerts-and-slos.md`.
 
-Sample intelligently: keep every error and slow request, sample the rest. Tracing everything at volume
-costs a lot and adds little.
+### Step 4, traces
 
-Span names should be low cardinality, with identifiers as attributes rather than in the name.
+Trace across service boundaries when there is more than one service, or when latency is spread across
+external calls. For a single application, logs with durations cover most of it. Use
+[OpenTelemetry](https://opentelemetry.io/docs/) so the instrumentation is not tied to one vendor.
 
-### Step 4, alerts
+Keeping every error and slow trace while sampling the rest needs tail based sampling, done in a
+collector after the whole trace has arrived, for example the OpenTelemetry Collector tail sampling
+processor. Head based sampling in the SDK decides when the trace starts, before the outcome is known, so
+it drops errors at the same rate as successes. Tail sampling needs every span of a trace routed to the
+same collector instance and memory to buffer traces while waiting. Trade-offs in
+`references/alerts-and-slos.md`.
 
-Alert on symptoms users feel, not on causes. High error rate and high latency are symptoms. High CPU is a
-cause that may be harmless.
+Span names stay low cardinality. Identifiers go in attributes.
 
-Every alert gets a name, a threshold with a duration, an owner, a link to the runbook, and the action to
-take. No action means no alert.
+### Step 5, change markers
 
-Two tiers only. Page a human for something requiring action within minutes. Ticket everything else. A
-third tier becomes noise.
+Record every deploy, configuration change, feature flag change and migration as an event with version,
+time and author, and overlay it on dashboards. "What changed near that time" is the question most often
+left unanswered, and a marker answers it in one glance.
 
-Set thresholds from observed behaviour, not from a round number. Look at a week of data first.
+### Step 6, dashboards
 
-Alert on absence as well as excess. A queue consumer that stops consuming often produces no errors at
-all, and silence is the signal.
+One dashboard per service, laid out to answer the step 1 questions in order: SLO and error rate, traffic,
+latency percentiles from histograms, saturation, dependency latency and errors, with change markers on
+every time axis. Breakdowns by region, version and tenant come next.
 
-Include a rate of change alert for anything that should be stable, since a slow leak never crosses a
-static threshold until it is too late.
+No vanity panels. A panel nobody would act on, such as total signups ever or the CPU of a host that
+autoscales, pushes the useful panels off the screen. Remove it.
 
-Review fired alerts monthly. Any alert that fired and needed no action gets fixed or deleted.
+### Step 7, SLOs and error budget
 
-### Step 5, service level objectives
+Pick one or two user facing objectives, such as the share of requests served successfully within a
+stated latency over a rolling 30 days. Set the target from what users need and the business accepts,
+not from what the system happens to achieve. Compute the error budget in minutes or requests, and use
+what remains to decide between shipping and stabilising. Worked example in
+`references/alerts-and-slos.md`.
 
-Pick one or two user facing objectives, such as the share of requests served successfully within a stated
-time over a rolling month.
+### Step 8, alerts
 
-Set the target from what users need and the business accepts, not from what is currently achieved.
+Alert on symptoms users feel, not causes. Page on SLO burn rate using the multiwindow, multi burn rate
+method from the Google SRE workbook ([Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)).
+A fixed error rate threshold either pages on brief blips or misses slow burns. The workbook pairs and
+the expressions are in `references/alerts-and-slos.md`.
 
-Use the remaining error budget to decide whether to ship or to stabilise. That is the practical value of
-an objective, and without that link it is a dashboard nobody reads.
+Every alert follows the template in that file: name, threshold and duration, owner, runbook, action.
+Two tiers only: page for action within minutes, ticket for everything else.
 
-### Step 6, verify
+Alert on absence as well as excess:
 
-Trigger a real error and follow it through: does it appear in the aggregator with the correlation
-identifier and enough context to diagnose without reproducing?
+- A watchdog alert that always fires, routed to an external dead man's switch service that pages when the watchdog stops arriving. This is the only thing that tells you the monitoring system itself is down.
+- A heartbeat per cron job and scheduled task. The job pings on success, and a missing ping after the expected interval plus a grace period alerts. A job that silently stops running produces no errors.
+- A consumer that stops consuming, shown by queue age or depth rising while the processed count is flat.
 
-Take a real correlation identifier and find every log line for that request across services.
+Run external synthetic checks from outside your own network and cloud provider, over the real user path
+including DNS and TLS, from more than one location, alerting only when several locations fail. Internal
+health checks cannot see a DNS, certificate or CDN failure.
 
-Fire a test alert and confirm it reaches a human on the correct channel, including out of hours.
+Review fired alerts monthly. An alert that fired and needed no action gets fixed or deleted.
 
-Query the logs for patterns that look like tokens, card numbers, email addresses and passwords, and fix
-what you find.
+### Step 9, client side
 
-Check the monthly cost of logs, metrics and traces, since this grows quietly and is often the largest
-observability surprise.
+Server metrics cannot see a JavaScript error, a slow render on a cheap phone, or a crash on launch. For
+web, collect real user monitoring (Core Web Vitals and front end errors, with source maps uploaded so
+stack traces are readable). For mobile, use crash reporting with symbol files uploaded for every build
+(dSYM for iOS, the R8 or ProGuard mapping file for Android) and track crash free sessions per release.
+Tag client events with release version so a regression lines up with a change marker.
+
+### Step 10, verify
+
+Trigger a real error and follow it: it reaches the aggregator with the trace ID and enough context to
+diagnose without reproducing. Take that trace ID and find every log line and span for the request across
+services. Fire a test page and confirm it reaches a human on the right channel, out of hours included.
+Stop the watchdog in a test and confirm the dead man's switch pages. Skip a cron heartbeat and confirm it
+alerts. Run the log audit queries from `references/alerts-and-slos.md` and fix what they find. Check the
+monthly cost of logs, metrics and traces, which grows quietly.
 
 ## Self-audit
 
-- Correlation identifier through every log line and propagated downstream.
-- Logs structured and queryable, with levels used deliberately.
-- Request rate, error rate, high percentile latency and saturation in place.
-- At least one business event monitored.
-- Label cardinality bounded.
-- Every alert has an owner, a runbook and an action.
-- Absence alerts exist for consumers and scheduled work.
-- An error was traced end to end as a test.
-- Alert delivery verified to a human.
-- Logs audited for secrets and personal data.
-- Retention and cost decided.
+- The step 1 questions are written down, and each dashboard panel maps to one of them.
+- A single trace ID from `traceparent` appears on every log line and in error responses.
+- Latency comes from histograms aggregated before the percentile is computed; no averaged percentiles.
+- Gauges used for saturation have a stated scrape interval, and spikes are covered where they matter.
+- If the design keeps errors and slow traces, tail sampling in a collector is configured, not head sampling.
+- Paging alerts use burn rate pairs, and each has an owner, a runbook and an action.
+- A watchdog with an external dead man's switch exists and was tested.
+- Every cron job has a heartbeat, and external synthetic checks run from outside the provider.
+- Deploys and config changes appear as markers on dashboards.
+- Client errors, and crashes for mobile, are collected with symbols or source maps.
+- Label cardinality is bounded, and the log audit for secrets and personal data was run.
+- Retention and cost are decided for each signal.
+
+## What this cannot do
+
+It cannot see production. Every recommendation depends on the traffic, the stack and the vendor the
+user describes, and alert thresholds must be set from observed data, which this skill does not have.
+
+It cannot price the setup. Vendor pricing for logs, metrics and traces changes; retrieve the current
+price list from the vendor before comparing options.
+
+It cannot decide the SLO target. That is a business decision about what users will tolerate.
+
+Log retention for personal data is a legal question in many jurisdictions. Ask a privacy lawyer: "Our
+application logs contain these fields (list them) about users in these jurisdictions (list them); what
+is the longest we may retain them, and do they need to be covered by our records of processing and
+deletion requests?"

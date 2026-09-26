@@ -12,7 +12,8 @@ Seats work when value grows with the number of people using it and fail when a f
 the value, since customers then share logins.
 
 Usage works when consumption tracks value and fails when the customer cannot predict their bill, which
-kills enterprise deals because procurement cannot approve an unbounded number.
+stalls enterprise deals because procurement struggles to approve an unbounded number. A cap or a committed
+spend tier fixes most of that.
 
 Outcome based pricing aligns best and is hardest to measure and to collect on.
 
@@ -33,33 +34,44 @@ Then position between floor and ceiling according to how strong the alternative 
 support a price near the ceiling.
 
 Test the price by asking for the money. A quoted price that a real buyer accepts without hesitation was
-probably too low, and one that ends every conversation is too high. Two out of ten converting at a high
-price beats eight out of ten at a low one when acquisition cost is the same.
+probably too low, and one that ends every conversation is too high.
+
+Compare two prices by expected value per prospect: conversion rate x contribution per customer -
+acquisition cost per prospect. With the same cost per prospect, two out of ten converting at a high price
+beats eight out of ten at a low one only when the high price's contribution is more than four times the
+low one's. Use lifetime contribution from `references/formulas.md` where customers repeat.
 
 ## Budget authority
 
 Every organisation has thresholds above which a purchase needs another signature. Crossing one adds
 weeks and sometimes a procurement process, a security review, and a legal review.
 
-Pricing just under a common threshold shortens the cycle. Pricing just over it triples the work for a
-few percent more revenue. Ask what the buyer can approve alone.
+Pricing just under the buyer's threshold can shorten the cycle, and pricing just over it can add an
+approval round for a few percent more revenue. Thresholds differ by organisation, so ask each buyer what
+they can approve alone rather than assuming a common figure.
 
 ## Tiers
 
-Three tiers is conventional because it works, and the reason is that the middle tier gets chosen. Design
-the middle tier as the one you want sold, then build the others around it.
+Three tiers is a common convention. Whether buyers gravitate to the middle one depends on the product and
+the page, so treat that as a hypothesis and measure tier mix on real signups. Design the tier you want sold
+first, then build the others around it.
 
 The cheap tier exists to remove the price objection and to qualify buyers, not to make money. Keep it
 narrow enough that serious users outgrow it.
 
-The expensive tier exists to make the middle one look reasonable and to capture large customers. It
+The expensive tier exists to capture large customers, and it may also make the middle one look
+reasonable by comparison. It
 should contain the things large buyers genuinely need, such as access control, audit logs, single sign
 on, support response times, and contractual terms.
 
 Differentiate tiers by value received, not by artificial restriction of things that cost nothing to
 provide. Buyers notice, and it damages trust.
 
-Avoid more than four tiers. Choice paralysis reduces conversion.
+Keep the number of tiers small enough that a buyer can tell which one fits them. Do not justify this with
+choice paralysis: a meta-analysis of choice overload experiments (Scheibehenne, Greifeneder and Todd,
+"Can there ever be too many options?", Journal of Consumer Research, 2010) found a mean effect near zero,
+with large variation between studies. The practical reason is that each extra tier is another boundary to
+explain, support, and defend. Test tier count on real conversion if it matters.
 
 ## Changing prices
 
@@ -92,7 +104,16 @@ value delivered.
 Charging for a model API wrapper at a flat rate while the underlying cost is per token puts the heaviest
 users at a loss. Compute the unit economics at the usage level of the top decile, and cap or meter.
 
-Pricing in a currency the buyer does not use pushes conversion risk onto them and reduces conversion.
+Pricing in a currency the buyer does not use pushes exchange rate risk onto them, which is a reason to
+lose the sale.
 
-Setting a price and never revisiting it. Most early prices are too low, because they were set when the
-product did less and the founder had less confidence.
+Showing a consumer price without tax where the buyer expects it included. UK and EU consumer prices are
+normally displayed VAT inclusive, so the business keeps price / (1 + VAT rate), not the displayed number.
+Compute contribution on the net figure. B2B prices are usually quoted before VAT.
+
+Payment terms are part of the price. Net 60 on a 1,000 order costs the seller the financing of 1,000 for
+two months; a deposit or upfront payment does the reverse. Put terms and deposits into the cash cycle in
+`references/formulas.md` before offering them in a negotiation.
+
+Setting a price and never revisiting it. An early price was set when the product did less and the
+founder had less evidence, so re-test it against conversion as both change.

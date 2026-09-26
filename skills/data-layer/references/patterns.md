@@ -11,7 +11,16 @@ Handle it at a layer that cannot be forgotten, such as a view or a default scope
 remembering in each query.
 
 Unique constraints interact badly with soft delete. A unique email column blocks re-registration after
-deletion. Use a partial unique index limited to rows where deleted is null.
+deletion. In Postgres and SQLite, use a partial unique index limited to rows where deleted is null.
+MySQL has no partial indexes. The workaround is a generated column that holds the value only for live
+rows, with a unique index on it, since a unique index allows many nulls:
+
+```
+ALTER TABLE users
+  ADD COLUMN live_email VARCHAR(255)
+    GENERATED ALWAYS AS (IF(deleted_at IS NULL, email, NULL)) STORED,
+  ADD UNIQUE INDEX users_live_email_uniq (live_email);
+```
 
 Decide what deletion means for children. A soft deleted order with hard deleted lines is worse than
 either choice made consistently.
@@ -44,6 +53,13 @@ composite indexes because it appears in every query.
 Enforce the filter where forgetting it fails rather than returning everything. Row level security in the
 database, or a query layer that requires the tenant, both work. Relying on each query to remember is how
 cross tenant leaks happen.
+
+Postgres row level security has two traps. Table owners and superusers bypass policies unless the table
+has `ALTER TABLE ... FORCE ROW LEVEL SECURITY`, and the application often connects as the owner, so run
+the application as a separate role without superuser or ownership as well. With a connection pool, a
+session variable set for one request leaks into the next request on that connection. Set the tenant per
+transaction with `SET LOCAL app.tenant_id = '...'` (or `set_config(..., true)`) and have policies read it
+with `current_setting('app.tenant_id')`.
 
 Include the tenant in unique constraints. An email unique across the whole table prevents the same person
 existing in two tenants, which is usually wrong.
@@ -95,8 +111,27 @@ Guard the transition in one place. Status changes scattered across handlers prod
 Store the scheduled instant in UTC, and separately store the user's intent if it is recurring, because a
 weekly local time reminder is not a fixed UTC offset once daylight saving moves.
 
-For a queue in the database, use the engine's skip locked support to claim rows, or several workers take
-the same job.
+For a queue in the database, claim rows with `FOR UPDATE SKIP LOCKED` (Postgres 9.5+, MySQL 8.0+), or
+several workers take the same job. A row lock alone does not survive a crashed worker that already
+committed the claim, so give each claim a lease: a `locked_until` time that other workers treat as
+expired. This is the visibility timeout that hosted queues provide.
+
+```
+UPDATE jobs
+SET    locked_by = :worker, locked_until = now() + interval '5 minutes', attempts = attempts + 1
+WHERE  id IN (
+  SELECT id FROM jobs
+  WHERE  status = 'queued' AND run_after <= now()
+  AND    (locked_until IS NULL OR locked_until < now())
+  ORDER  BY run_after
+  LIMIT  10
+  FOR UPDATE SKIP LOCKED)
+RETURNING *;
+```
+
+The lease length is an ASSUMPTION: set it above the slowest normal job and have long jobs extend it with a
+heartbeat. A job that finishes after its lease expired may have been run twice, so make handlers
+idempotent. Move a job past its maximum attempts to a dead state instead of retrying forever.
 
 Record attempt count and last error on the job row, so a stuck job is visible.
 

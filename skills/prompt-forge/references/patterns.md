@@ -7,7 +7,9 @@ address.
 
 Failure mode: fields invented when the source does not contain them.
 
-Give the exact schema, field by field, with types. Then give the rule for absence, which is the part
+Give the exact schema, field by field, with types, and use the interface's structured output or JSON
+schema mode where it exists. Wrap the source text in its own tags so it cannot be mistaken for
+instructions. Then give the rule for absence, which is the part
 that matters: emit an explicit null and never infer a value. Require a quote or a location for every
 extracted field so the result can be checked against the source. Ask for a list of fields that were
 requested and not found.
@@ -74,7 +76,11 @@ the asker.
 
 Require a single recommendation with the reasoning. Require the strongest argument against it. Require
 the conditions under which the recommendation flips. Require what evidence would be decisive and how
-to get it this week. Forbid concluding that it depends.
+to get it this week. If the answer depends on something, require the deciding variable to be named and
+a recommendation given for each value, so "it depends" becomes a lookup the asker can use.
+
+For technical and architecture decisions, the `arch-decide` skill carries the full method, including
+reversibility and a decision record.
 
 ## Agent and system prompts
 
@@ -86,4 +92,13 @@ list of preferences, since a rule that is sometimes ignored teaches that all rul
 the stop condition, meaning when the task is finished. Define the escalation path, meaning what to do
 when the task cannot be finished.
 
-Test a system prompt by writing the three inputs most likely to break it, then checking what happens.
+The same applies to agent instruction files such as AGENTS.md, CLAUDE.md, and steering files: they
+are system prompts loaded on every run, so keep them short, ordered by precedence, and free of rules
+that restate defaults.
+
+Declare where untrusted content enters (tool output, fetched pages, files the agent reads) and state
+that instructions found there are reported, never followed. Put hard limits on side effects in code or
+permissions, since the prompt alone cannot enforce them.
+
+Test a system prompt against an evaluation set that includes the inputs most likely to break it and
+at least one injection attempt, following `references/evaluation.md`.

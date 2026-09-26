@@ -1,6 +1,7 @@
 # Recurring tradeoffs
 
-Analyses for the decisions that come up most. Each ends with the threshold that changes the answer.
+Analyses for recurring decisions. Each ends with the threshold that changes the answer, stated as
+something to measure or labelled `ASSUMPTION:`, never as a remembered figure.
 
 ## Deployment shape
 
@@ -19,9 +20,10 @@ What actually forces a split: a component with genuinely different scaling behav
 transcoding, a compliance boundary requiring separation, a team large enough that deploy contention is
 measurable, or a part needing a different runtime.
 
-Threshold: below roughly fifteen engineers, deploy contention is rarely the real constraint, so a split
-usually costs more than it returns. Above that, measure how often deploys block each other before
-deciding.
+Threshold: measure deploy contention before splitting. Count how often a deploy waits on or gets
+reverted because of another team's change, and how long the wait is, over a few weeks.
+`ASSUMPTION:` on a small team that shares one on call rota, that count is usually near zero, so a split
+buys little. The measurement decides it, not the headcount.
 
 ## Service communication
 
@@ -39,9 +41,31 @@ complexity without decoupling anything the user experiences.
 Every asynchronous consumer must be idempotent, because delivery will repeat. Design the idempotency key
 before writing the consumer.
 
+## Writing and publishing together: outbox and change data capture
+
+A service that commits to its database and then publishes a message has two writes that are not atomic.
+If the process dies between them, the event is lost. If it publishes first and the commit fails, the
+event describes something that never happened. Retrying does not fix either case.
+
+Transactional outbox: write the event into an outbox table in the same transaction as the business
+change. A separate relay reads the outbox, publishes each row, and then marks it sent. Delivery becomes at least
+once, so consumers stay idempotent. Costs: a relay process to run and watch, and outbox cleanup.
+
+Change data capture: read the database's own change log (for example the PostgreSQL write ahead log
+through logical decoding, or the MySQL binlog) and publish from it. No application change, and every
+committed change is seen. Costs: a connector to operate, coupling consumers to table shape unless the
+connector publishes from an outbox table, and replication slot or log retention management on the
+database. Retrieve the current documentation of the chosen connector and database for retention and
+failure behaviour.
+
+Threshold: any design where a message must reflect a committed database change uses one of the two.
+Choose the outbox when the team owns the service code and wants explicit event shapes. Choose change
+data capture when the source cannot be changed, or when many tables need streaming.
+
 ## Datastore selection
 
-A relational database is the default and covers most workloads well past the point people assume. It
+A relational database is the default and covers a wide range of workloads further than people assume.
+Engine choice and schema detail belong to `data-layer`. It
 gives constraints, transactions, joins, and a query planner that has had decades of work. Modern ones
 handle JSON documents, full text search, queueing and geospatial data adequately, which removes several
 reasons teams historically added a second store.
@@ -70,11 +94,24 @@ store after indexing has been done properly, not before.
 Order of attempts: fix the query and add the index first, then cache.
 
 Cache invalidation is the hard part and it needs deciding before the cache is added. Time based expiry is
-simple and serves stale data for a known window. Event based invalidation is correct and easy to get
-wrong. Never invalidate on write into a cache written by another process.
+simple and serves stale data for a known window. Event based invalidation is fresher and easy to get
+wrong.
 
-Cache the expensive and stable. Never cache something whose staleness is visible to a user in a way that
-matters, such as a balance or a permission.
+With cache-aside, the writer commits to the database and then deletes the cache key. It does not write
+the new value into the cache. Setting the value on write races with a reader that missed the cache,
+read the old row, and then fills the cache with that stale value after the writer's set, leaving stale
+data that stays until expiry. Deleting after commit narrows that race without closing it, so still put
+a TTL on every entry as the bound on how long a lost race can last. Where staleness is unacceptable,
+use versioned keys or read from the database.
+
+Cache the expensive and stable. Do not cache values whose staleness a user sees in a way that matters,
+such as a balance, unless the read path tolerates it by design.
+
+Permissions and roles may be cached only with a short TTL and explicit invalidation when a permission
+changes (role removed, user suspended, membership revoked). An authorisation decision is never cached
+without both. The TTL bounds how long a revoked permission survives if an invalidation event is lost,
+and the invalidation makes revocation take effect at once in the normal case. The API design reference
+in `backend-build` states the same rule.
 
 Ask what happens on a cold cache. If the system cannot survive one, the cache is load bearing
 infrastructure and needs the same care as the database.
@@ -85,8 +122,9 @@ Shared schema with a tenant column is simplest and scales to many tenants. The r
 in one query leaking data across tenants, so enforce it at a layer that cannot be forgotten rather than
 in each query.
 
-Schema per tenant eases per tenant restore and export, and makes migrations slow past a few hundred
-tenants.
+Schema per tenant eases per tenant restore and export. Every migration runs once per schema, so
+migration time grows with tenant count. Measure one schema's migration time on production sized data
+and multiply by the expected tenant count before choosing it.
 
 Database per tenant gives the strongest isolation and the highest operational cost, and is usually driven
 by a contract rather than by engineering.
@@ -117,5 +155,25 @@ database, and pricing that becomes unfavourable under steady high load.
 
 Long running processes suit steady load, long connections, websockets, and anything needing a warm cache.
 
-Threshold: at steady high utilisation, a reserved instance is usually cheaper than per invocation
-pricing. Model the cost at expected load with `business-model` rather than assuming either direction.
+Threshold: at steady high utilisation, reserved capacity can be cheaper than per invocation pricing.
+Retrieve both current price pages, model the cost at expected load with `business-model`, and check the
+arithmetic with `numbers-check` before assuming either direction.
+
+## Build against buy, managed against self-hosted
+
+Buying or using a managed service moves operational hours to a vendor and adds a bill, a dependency and
+an exit problem. Building or self-hosting keeps control and adds hours that never stop.
+
+Cost both sides in ongoing hours per month, not only in the invoice. Self-hosting a database means
+patching, upgrades, backups, restore tests, failover, monitoring and being paged. Price those hours at
+the team's loaded cost, labelled `ASSUMPTION:` if no figure is given, and compare them with the vendor's
+current retrieved price at expected load.
+
+Buy what is not the product and is well served by the market: auth, email delivery, payments, error
+tracking. Build what is the product, or where no vendor meets a hard requirement.
+
+Before buying anything that holds data, run the exit checks in `references/exit-paths.md`.
+
+Threshold: self-host when the measured or estimated hours cost less than the managed price and the team
+has someone who can own the pager for it. Otherwise buy, and record the exit path. Hosting mechanics
+belong to `infra-deploy`.

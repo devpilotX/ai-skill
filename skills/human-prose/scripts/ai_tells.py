@@ -15,7 +15,7 @@ Severity levels:
 Exit codes:
   0  nothing above the failing threshold
   1  findings at or above the failing threshold
-  2  usage error
+  2  usage error, or a path that could not be read
 
 The default failing threshold is high. Pass --strict to fail on medium as well,
 or --pedantic to fail on anything.
@@ -49,6 +49,16 @@ ALL_RULES = {
 }
 
 
+# Leaked markup and unfilled placeholders are never acceptable in a shipped file,
+# so the blanket "all" token cannot exempt them. Naming them explicitly still works,
+# because a file that documents the patterns has to quote them.
+NEVER_EXEMPT = {"artifact", "placeholder"}
+
+# Below this many words a single hit dominates the density figure, so the density
+# rule is not applied to very short files.
+DENSITY_MIN_WORDS = 100
+
+
 def parse_exemptions(lines: list[str]) -> set[str]:
     # The window is generous enough to sit just below YAML frontmatter.
     head = "\n".join(lines[:20])
@@ -61,7 +71,8 @@ def parse_exemptions(lines: list[str]) -> set[str]:
             if token in ALL_RULES:
                 rules.add(token)
             elif token == "all":
-                rules |= set(ALL_RULES)
+                # "all" never switches off the near-proof-of-origin rules.
+                rules |= set(ALL_RULES) - NEVER_EXEMPT
     return rules
 
 # Vocabulary with measured overrepresentation in post-2022 model output.
@@ -76,6 +87,13 @@ VOCAB = [
     "myriad", "plethora", "profound", "groundbreaking", "renowned", "nestled",
     "multifaceted", "paradigm", "synergy", "cultivate", "cultivating",
     "embark", "harness", "harnessing", "unparalleled", "noteworthy",
+    # Inflections and British spellings. Ambiguous words such as leverage (a
+    # finance noun), landscape, navigate and unlock (literal senses in software)
+    # are left to human review, see STYLE.md.
+    "delves", "delved", "showcased", "fosters", "fostered", "garners",
+    "garnering", "bolsters", "bolstering", "harnessed", "harnesses",
+    "embarked", "embarking", "embarks", "enhanced", "enhancement",
+    "utilise", "utilised", "utilises", "utilising", "leveraging", "tapestries", "meticulousness",
 ]
 
 VOCAB_PHRASES = [
@@ -124,14 +142,19 @@ VAGUE_ATTRIBUTION = [
 COLLABORATIVE_CHATTER = [
     r"\bI hope this helps\b",
     r"\bwould you like me to\b",
-    r"\blet me know if\b",
-    r"\bis there anything else\b",
+    r"\bis there anything else I can\b",
     r"\bhere('s| is) (a|an|the) (breakdown|overview|summary) (of|for) \b",
     r"\bas an AI (language )?model\b",
-    r"\bcertainly!\b",
-    r"\bof course!\b",
+    r"\bcertainly!(?=\s|$)",
+    r"\bof course!(?=\s|$)",
     r"\byou('re| are) absolutely right\b",
     r"\bgreat question\b",
+]
+
+# Phrases that are ordinary in a human email or issue comment, and a tell only when
+# they close a document addressed to a reader. Reported at low severity.
+CHATTER_SOFT = [
+    r"\blet me know if\b",
     r"\bfeel free to\b",
 ]
 
@@ -139,7 +162,7 @@ CUTOFF_DISCLAIMERS = [
     r"\bas of my (last )?(knowledge|training) (update|cutoff)\b",
     r"\bup to my last (training|knowledge)\b",
     r"\bwhile specific details are (limited|scarce)\b",
-    r"\bnot widely (available|documented|disclosed)\b",
+    r"\bnot widely (documented|disclosed)\b",
     r"\bbased on (the )?available information\b",
     r"\bin the (provided|available) sources\b",
     r"\bmaintains a low profile\b",
@@ -148,7 +171,7 @@ CUTOFF_DISCLAIMERS = [
 
 SECTION_SUMMARY = [
     r"^\s*#{1,6}\s*(conclusion|in conclusion|summary|final thoughts|closing thoughts)\s*$",
-    r"^\s*(in conclusion|in summary|to summarize|to sum up|overall,)\b",
+    r"^\s*(?:(?:in conclusion|in summary|to summari[sz]e|to sum up)\b|overall,)",
     r"^\s*#{1,6}\s*(challenges and legacy|future outlook|future prospects)\s*$",
     r"\bdespite (its|these) [a-z ]{0,30}(challenges|limitations)\b",
 ]
@@ -172,11 +195,12 @@ ARTIFACTS = [
 ]
 
 PLACEHOLDERS = [
-    (r"\[(insert|add|your)[^\]]{0,40}\]", "unfilled bracket placeholder"),
+    # A bracket followed by "(" is a Markdown link such as [your settings](url).
+    (r"\[(insert|add|your)\b[^\]]{0,40}\](?!\()", "unfilled bracket placeholder"),
     (r"\b20\d\d-(xx|XX)-(xx|XX)\b", "placeholder date"),
     (r"<!--\s*(add|insert)[^>]{0,60}(if available|here)\s*-->", "placeholder comment"),
     (r"\[(Entertainer|Company|Product|Name)'?s? Name\]", "template placeholder"),
-    (r"\bTODO\b(?!\()", "leftover TODO"),
+    (r"(?-i:\bTODO\b)(?!\()", "leftover TODO"),
     (r"\bLorem ipsum\b", "filler text"),
 ]
 
@@ -243,6 +267,10 @@ def is_emoji(ch: str) -> bool:
     if ch in "\u200d\ufe0f":
         return False
     code = ord(ch)
+    # Letterlike symbols such as the trade mark sign, arrows, and box drawing
+    # characters used in directory trees are ordinary typography.
+    if 0x2100 <= code <= 0x21FF or 0x2500 <= code <= 0x25FF:
+        return False
     ranges = (
         (0x1F300, 0x1FAFF), (0x1F000, 0x1F2FF), (0x2600, 0x27BF),
         (0x2B00, 0x2BFF), (0xFE0F, 0xFE0F), (0x1F1E6, 0x1F1FF),
@@ -252,17 +280,44 @@ def is_emoji(ch: str) -> bool:
     return unicodedata.category(ch) == "So" and code > 0x2100
 
 
+FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+
+
 def strip_code_and_fences(lines: list[str]) -> list[bool]:
-    """Return a mask marking lines that sit inside a fenced code block."""
-    inside = False
+    """Return a mask marking lines inside a fenced code block.
+
+    Both backtick and tilde fences are recognised. A fence closes only on a line
+    that uses the same character at least as many times, as in CommonMark.
+    """
+    fence = ""
     mask = []
     for line in lines:
-        if line.lstrip().startswith("```"):
+        m = FENCE_RE.match(line)
+        if not fence and m:
+            fence = m.group(1)
             mask.append(True)
-            inside = not inside
             continue
-        mask.append(inside)
+        if fence and m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                and not line.strip()[len(m.group(1)):].strip():
+            fence = ""
+            mask.append(True)
+            continue
+        mask.append(bool(fence))
     return mask
+
+
+def frontmatter_end(lines: list[str]) -> int:
+    """Return the index of the closing frontmatter line, or -1 if there is none.
+
+    A document that opens with three hyphens but never closes them has no
+    frontmatter, so it is scanned in full rather than skipped.
+    """
+    if not lines or lines[0].lstrip("\ufeff").strip() != "---":
+        return -1
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == "---":
+            return idx
+    return -1
 
 
 def looks_title_case(heading: str) -> bool:
@@ -290,7 +345,7 @@ def scan(path: str, text: str) -> list[Finding]:
     exemptions = parse_exemptions(lines)
     exempt_vocab = "vocab" in exemptions
     in_code = strip_code_and_fences(lines)
-    in_frontmatter = False
+    fm_end = frontmatter_end(lines)
     vocab_hits: dict[str, list[int]] = {}
     word_total = 0
 
@@ -301,23 +356,18 @@ def scan(path: str, text: str) -> list[Finding]:
 
     for i, raw in enumerate(lines, start=1):
         line = raw
-        if i == 1 and line.strip() == "---":
-            in_frontmatter = True
-            continue
-        if in_frontmatter:
-            if line.strip() == "---":
-                in_frontmatter = False
-            continue
-
+        # Leaked markup is reported everywhere, including frontmatter and code,
+        # because it is near proof of origin wherever it sits.
         for pat, label in ARTIFACTS:
             if re.search(pat, line, re.I):
                 add(i, "high", "artifact", label)
+        if i - 1 <= fm_end:
+            continue
+        if in_code[i - 1]:
+            continue
         for pat, label in PLACEHOLDERS:
             if re.search(pat, line, re.I):
                 add(i, "high", "placeholder", label)
-
-        if in_code[i - 1]:
-            continue
 
         if "\u2014" in line:
             add(i, "medium", "em-dash", "em dash, use a comma, colon, parentheses or a new sentence")
@@ -330,10 +380,14 @@ def scan(path: str, text: str) -> list[Finding]:
         bad_emoji = [c for c in line if is_emoji(c)]
         if bad_emoji:
             add(i, "medium", "emoji", "emoji used in text: " + " ".join(sorted(set(bad_emoji))))
-        if re.fullmatch(r"\s*(-{3,}|\*{3,}|_{3,})\s*", line):
-            add(i, "medium", "thematic-break", "horizontal rule between sections")
+        if re.fullmatch(r"\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})", line):
+            prev = lines[i - 2] if i >= 2 else ""
+            setext = bool(prev.strip()) and re.fullmatch(r"\s{0,3}-+\s*", line) \
+                and not re.match(r"\s*([-*+]|\d+[.)])\s", prev)
+            if not setext:
+                add(i, "medium", "thematic-break", "horizontal rule between sections")
 
-        heading = re.match(r"\s*(#{1,6})\s+(.*\S)\s*$", line)
+        heading = re.match(r"\s{0,3}(#{1,6})\s+(.*\S)\s*$", line)
         if heading:
             body = heading.group(2)
             if looks_title_case(body):
@@ -343,7 +397,7 @@ def scan(path: str, text: str) -> list[Finding]:
                 add(i, "low", "x-and-y-heading",
                     "heading pairs a puffery noun with another: " + body)
 
-        if re.match(r"\s*[-*+]\s+\*\*[^*]{2,40}\*\*\s*:", line):
+        if re.match(r"\s*[-*+]\s+\*\*(?:[^*]{2,40}\*\*\s*:|[^*]{2,40}:\*\*)", line):
             add(i, "low", "bold-label-list", "bold inline header on a list item")
 
         if re.match(r"\s*Additionally,", line):
@@ -365,6 +419,11 @@ def scan(path: str, text: str) -> list[Finding]:
             if re.search(pat, line, re.I):
                 add(i, "high", "chatter", "text addressed to the operator rather than the reader")
                 break
+        else:
+            for pat in CHATTER_SOFT:
+                if re.search(pat, line, re.I):
+                    add(i, "low", "chatter", "sign-off phrase, fine in an email, a tell in a document")
+                    break
         for pat in CUTOFF_DISCLAIMERS:
             if re.search(pat, line, re.I):
                 add(i, "high", "cutoff-disclaimer", "knowledge cutoff or missing source disclaimer")
@@ -398,7 +457,7 @@ def scan(path: str, text: str) -> list[Finding]:
                 for _ in re.finditer(r"\b" + re.escape(w) + r"\b", lowered):
                     vocab_hits.setdefault(w, []).append(i)
             for p in VOCAB_PHRASES:
-                if p in lowered:
+                for _ in re.finditer(r"\b" + re.escape(p) + r"\b", lowered):
                     vocab_hits.setdefault(p, []).append(i)
 
     if vocab_hits:
@@ -409,7 +468,7 @@ def scan(path: str, text: str) -> list[Finding]:
             add(hit_lines[0], sev, "vocab",
                 "overrepresented term '%s' x%d (lines %s)"
                 % (word, len(hit_lines), ",".join(str(n) for n in hit_lines[:8])))
-        if density > 4.0:
+        if density > 4.0 and word_total >= DENSITY_MIN_WORDS:
             add(1, "medium", "vocab-density",
                 "overrepresented vocabulary density %.1f per 1000 words, budget 4.0" % density)
 
@@ -430,11 +489,13 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
 
     targets: list[tuple[str, str]] = []
+    missing = 0
     if args.paths:
         for p in args.paths:
             fp = Path(p)
             if not fp.is_file():
                 print("skip (not a file): %s" % p, file=sys.stderr)
+                missing += 1
                 continue
             try:
                 targets.append((p, fp.read_text(encoding="utf-8")))
@@ -472,6 +533,10 @@ def main(argv: list[str]) -> int:
     print("\nscanned %d file(s): %d high, %d medium, %d low"
           % (len(targets), counts["high"], counts["medium"], counts["low"]))
 
+    if missing:
+        # A mistyped path must not turn into a silent pass.
+        print("%d path(s) could not be read" % missing, file=sys.stderr)
+        return 2
     if args.pedantic:
         return 1 if findings else 0
     if args.strict:

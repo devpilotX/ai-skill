@@ -1,145 +1,199 @@
 ---
 name: business-model
-description: Build and stress test the economics of a business, product, or pricing decision with real numbers. Use when the user asks how to price something, whether a business can make money, how to model revenue and costs, what their margins or break-even or runway look like, how to structure a subscription or usage based plan, or asks for a financial model, a unit economics breakdown, or help with a business plan. Also use after reality-check returns BUILD or PIVOT, since this is the constructive follow-on. Computes contribution margin per unit, the working capital cycle, break-even volume, payback period and runway with a script rather than in prose, names which single assumption the outcome depends on, and states the price the market will actually bear rather than a cost-plus figure. Triggers on how should I price this, unit economics, business model, financial model, can this make money, what are my margins, break even, runway, pricing strategy, subscription pricing.
+description: Build and stress test the economics of a business, product, or pricing decision. Use when the user asks how to price something, whether a business can make money, what their margins, gross margin, break-even, CAC, LTV, churn, payback or runway look like, how to structure a subscription, usage based plan or pricing page, or asks for a financial model, cash flow forecast, or unit economics breakdown. Also use after reality-check returns BUILD or PIVOT. Computes contribution net of VAT, the cash conversion cycle, break-even, payback on contribution, LTV from a retention curve and peak funding with a script, and names the single assumption the outcome depends on. Triggers on how should I price this, unit economics, business model, financial model, can this make money, what are my margins, break even, runway, CAC payback, LTV to CAC, churn, cash flow forecast, pricing strategy, subscription pricing. For whether to do it at all use reality-check. For bookkeeping and statements use finance-books.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Business model
 
-Arithmetic about a business, done honestly. The purpose is to find the number that decides the outcome
-before real money gets committed to finding it out.
+The failure this corrects: business arithmetic done in prose, where a unit error or a double count goes
+unnoticed and the model says a plan works when it runs out of cash. The usual culprits are multiplying
+cycle days by a monthly cost, computing payback on revenue instead of contribution, counting the founder's
+pay twice, and treating a VAT inclusive price as revenue. This skill computes with a script and names the
+number that decides the outcome before real money gets committed to finding it out.
 
-## Relationship to the other skills
+## When to use and when to stay off
 
-Use `reality-check` first when the question is whether to do this at all. Use this skill when the
-decision is made and the question is whether the numbers work, and at what price and volume.
+Run when the decision to pursue something is made, or nearly made, and the question is whether the numbers
+work, at what price, at what volume, and with how much cash. Run when a user shares a model, a pricing
+page, or a forecast and asks whether it holds up.
 
-Use `numbers-check` conventions throughout: compute with a script, carry units, cross-check, and label
-every assumption. Those rules apply here in full and are not repeated.
+Stay off when the user wants a quick definition of a term, or has said the figures are a rough classroom
+exercise and asked for no modelling.
+
+Routing. Whether to do this at all goes to `reality-check` first, which hands over here after a BUILD or
+PIVOT verdict. Checking arithmetic, statistics or a spreadsheet someone else built goes to
+`numbers-check`, whose conventions apply here in full: compute with a script, carry units, cross-check,
+label every assumption. Bookkeeping, statements, and tax filings go to `finance-books`.
+
+The user says "stop", "I've decided", or "just execute": comply at once and stay off for the rest of the
+session unless asked again.
 
 ## Non-negotiables
 
-1. Every input is given by the user, retrieved with a citation, or labelled `ASSUMPTION:` with a range. No invented market sizes, conversion rates, or acquisition costs. A made up number in a model is worse than no model, because it gets acted on.
-2. Model cash, not only profit. A profitable business with a ninety day receivable cycle and thirty day payables runs out of money while growing. This kills more small businesses than weak demand.
-3. Pay the founder's labour in the model. A plan that only works when the owner works unpaid is a job with extra risk, and that should be a conscious choice.
-4. Price from value and willingness to pay, not from cost plus a margin. Then check that cost plus is covered. Those are two different tests and both have to pass.
+These override everything else in this file.
+
+1. Every input is given by the user, retrieved with a citation, or labelled `ASSUMPTION:` with a range. No invented market sizes, conversion rates, churn, or acquisition costs.
+2. Compute with `scripts/unit_economics.py`, never in prose, and paste its output next to the conclusion.
+3. Model cash, not only profit. The cash conversion cycle and peak funding appear in every model that holds stock, extends credit, or grows.
+4. Count founder labour exactly once: as a salary in fixed cost, or as hours per unit at a market rate in variable cost.
 5. Name the one assumption that decides it, and say how to verify it this week.
-6. If the model does not work, say so in the first line. Do not bury a negative result in a spreadsheet.
+6. If the model does not work, say so in the first line.
 
 ## Procedure
 
+Every formula and a worked example with real script output are in `references/formulas.md`. Run from the
+skill folder as shown, or from the repository root as
+`python3 skills/business-model/scripts/unit_economics.py`.
+
+```
+python3 scripts/unit_economics.py contribution --price 36 --vat-rate 0.20 --variable-cost 11 --variable-cost 5.40
+python3 scripts/unit_economics.py breakeven --fixed 6000 --contribution 12.70
+python3 scripts/unit_economics.py ccc --inventory-days 40 --receivable-days 2 --payable-days 30 --monthly-cogs 5500 --monthly-revenue 15000
+python3 scripts/unit_economics.py payback --cac 45 --monthly-contribution 12.70
+python3 scripts/unit_economics.py ltv --monthly-contribution 12.70 --churn 0.08 --months 24 --cac 45
+python3 scripts/unit_economics.py ltv --monthly-contribution 12.70 --retention 1 0.78 0.66 0.60 --cac 45
+python3 scripts/unit_economics.py peak-funding --flows -9000 -4500 -3200 -1800 -600 700 1900
+```
+
+Exit status 0 means computed, 2 means invalid input, and 3 means no finite answer, such as a negative
+contribution that never breaks even. Report a status 3 as the finding, not as an error to work around.
+
 ### Step 1, define the unit
 
-Everything follows from this and it is where most models go wrong. What is one of the thing being sold?
-One subscription month, one delivered order, one billable hour, one seat, one transaction.
+What is one of the thing being sold? One subscription month, one delivered order, one billable hour, one
+seat, one transaction. State it and hold it constant, because mixing units between revenue and cost breaks
+every later step.
 
-State the unit explicitly, then hold it constant. Mixing units between revenue and cost is the most
-common structural error in a homemade model.
+### Step 2, net price and contribution per unit
 
-### Step 2, contribution margin per unit
+Start from what the business keeps. Consumer prices in the UK and EU are normally displayed VAT inclusive,
+so net price = displayed price / (1 + VAT rate). Retrieve the current rate for the product and country from
+the tax authority. US sales tax is usually added at checkout and varies by location; retrieve it per
+jurisdiction.
 
-Revenue per unit, then subtract everything that varies with the unit.
+Subtract everything that varies with the unit: goods, direct labour at a market rate, payment processing,
+shipping and packaging, platform fees, hosting or model API cost, refunds, chargebacks and spoilage as a
+rate, and support per unit.
 
-Direct materials or wholesale cost. Direct labour at a market rate, including the founder's. Payment
-processing. Shipping and packaging. Platform or marketplace fees. Hosting or model API cost per unit for
-software. Refunds, chargebacks, spoilage, and wastage as a rate. Support cost per unit, which is real and
-usually omitted.
+Decide here where founder labour goes. If the founder's hours scale with units, charge them per unit at a
+market rate and leave the founder out of fixed cost. Otherwise leave them out of this step and pay a salary
+in step 3.
 
-If contribution margin is negative, stop. Volume makes a negative unit worse, and no amount of scale
-fixes it. Report that and stop.
+If contribution is negative, stop and report it. Volume makes a negative unit worse.
 
 ### Step 3, fixed costs and break-even
 
-Fixed monthly costs, including the ones people forget: insurance, accounting, software subscriptions,
-premises, compliance, and the founder's minimum draw.
+Fixed monthly costs, including the forgotten ones: insurance, accounting, software, premises, compliance,
+and the founder's salary unless step 2 already charged their time.
 
-Break-even volume is fixed cost divided by contribution margin per unit. Compute it, then ask whether
-that volume is reachable through a named channel. A break-even number with no distribution answer is
-arithmetic without meaning.
+Break-even units = fixed cost / contribution per unit, rounded up. Then name the channel that delivers that
+volume. A break-even number with no distribution answer means nothing.
 
-### Step 4, the working capital cycle
+### Step 4, the cash conversion cycle
 
-Days from paying for input to receiving cash from the customer. Inventory days plus receivable days minus
-payable days.
+CCC = DIO + DSO - DPO, in days. Inventory and payables are valued at cost of goods, receivables at revenue.
+Cash tied up = DIO x daily COGS + DSO x daily revenue - DPO x daily COGS, with daily = monthly x 12 / 365.
+Days times a monthly figure overstates the cash by about thirty times.
 
-Multiply the cycle by the monthly cost of goods to get the cash locked up at a given revenue level. Then
-compute it at three times that revenue, since growth increases the requirement.
+Compute it at current revenue and at three times current revenue, since growth increases the need. Then
+test the levers: deposits, upfront payment, shorter customer terms, early payment discounts priced as
+capital, longer supplier terms, less stock.
 
-This is the step most models skip and the one most likely to reveal that a plan needs twice the capital
-assumed.
-
-### Step 5, acquisition and payback
+### Step 5, retention, acquisition and payback
 
 Cost to acquire one customer through each named channel, retrieved or assumed with a range.
 
-Payback period in months, which matters more than lifetime value because it decides whether growth can
-be funded from revenue or needs outside money.
+Simple payback months = CAC / monthly contribution per customer. Contribution, not revenue.
 
-Retention or repeat rate, cohorted. Lifetime value only after that, and treated with suspicion, since it
-depends on a retention curve that does not exist yet for a new business.
+Retention, cohorted: the fraction of a starting cohort still paying in each month. Feed the curve, or a
+constant monthly churn if that is all there is, to the `ltv` subcommand with the CAC. It reports LTV over the
+horizon and the cohort payback month, which counts churn and is always later than simple payback. A new
+business has no curve, so label it `ASSUMPTION:` and treat LTV as the least reliable output.
 
-The test that matters: is acquisition cost recovered inside the cash cycle, not merely inside the
-customer's lifetime?
+The test that matters: is acquisition cost recovered inside the cash the business can fund, not merely
+inside the customer's lifetime?
 
 ### Step 6, pricing
 
-Willingness to pay comes from what the buyer currently spends on the problem, including the cost of
-doing nothing and of the manual workaround. Find that number before proposing a price.
+Willingness to pay comes from what the buyer spends on the problem today, including the cost of doing
+nothing and of the manual workaround. Find that number before proposing a price.
 
 Check the price against three references: the incumbent's price, the do-nothing cost, and the buyer's
-budget authority. A price above the level requiring approval from someone else lengthens the sales cycle
-regardless of value.
+approval threshold. Compare candidate prices by conversion x contribution - acquisition cost per prospect,
+never by conversion alone. Payment terms and deposits change cash, so run them through step 4 before
+offering them. Value metric, tiers, and traps are in `references/pricing.md`.
 
-Model structure and tier design, value metric selection, and the traps in usage based pricing are in
-`references/pricing.md`.
+### Step 7, peak funding
 
-### Step 7, sensitivity and the deciding assumption
+Lay out monthly net cash flow, including stock bought ahead and receivables not yet collected, and run
+the peak-funding subcommand. The result is the cash the plan needs before it pays back.
 
-Vary each assumption across its range. Report which single input moves the outcome most, and whether the
-conclusion flips inside the plausible range. If it does, the model does not yet answer the question, and
-the honest output says which measurement would settle it.
+### Step 8, sensitivity and the deciding assumption
 
-### Step 8, report
+Rerun the script across each assumption's range. Report which single input moves the outcome most, and
+whether the conclusion flips inside the plausible range. If it does, the model does not answer the question
+yet, and the output names the measurement that would.
+
+### Step 9, report
 
 ```
 VERDICT
-[Works at the stated assumptions / does not work / undetermined, in one line.]
+Works at the stated assumptions / does not work / undetermined, in one line.
 
 THE UNIT
-[What one unit is.]
+What one unit is.
 
-CONTRIBUTION MARGIN
-[Per unit, itemised, with provenance on each line.]
+CONTRIBUTION
+Net price after tax, each variable cost with provenance, contribution per unit.
 
 BREAK-EVEN
-[Volume, and whether a named channel can deliver it.]
+Volume, and the named channel that can deliver it.
 
 CASH
-[Working capital cycle in days, cash locked at current and 3x revenue, peak funding need.]
+CCC in days, cash tied up at current and 3x revenue, peak funding need.
 
-ACQUISITION
-[Cost per customer by channel, payback in months.]
+ACQUISITION AND RETENTION
+CAC by channel, simple payback, retention source, LTV and cohort payback month.
 
 PRICE
-[Proposed price, the three reference points, and the reasoning.]
+Proposed price, the three reference points, and the reasoning.
 
 THE DECIDING ASSUMPTION
-[The one input that determines the answer, and how to verify it within a week.]
+The one input that decides the answer, and how to verify it within a week.
 
 MODEL
-[The script, so the arithmetic can be checked and re-run.]
+The exact script commands and their output.
 ```
 
 ## Self-audit
 
 - The unit is stated and held constant.
-- Founder labour is priced.
-- Cash cycle is modelled, not just profit.
-- Every input has provenance, assumptions have ranges.
+- Contribution uses the net price after VAT or sales tax.
+- Founder labour appears exactly once.
+- The cash cycle uses daily figures, receivables at revenue.
+- Payback divides by contribution, not revenue.
+- LTV names its retention source, and an assumed curve is labelled.
+- Every input has provenance, and assumptions have ranges.
 - Break-even volume is tied to a named channel.
-- Price is justified from willingness to pay, and cost coverage is checked separately.
 - The deciding assumption is named with a verification step.
-- The script is included and its output matches the numbers in the text.
+- Every number in the report appears in pasted script output.
+
+## What this cannot do
+
+It cannot tell you demand. Conversion, churn, and CAC for a new business are assumptions until real
+customers produce them, and the model is only as good as those inputs.
+
+It does not give tax, legal, or investment advice. VAT registration, the rate for a given product, and
+whether a price display is compliant need a professional. Ask a chartered accountant or tax adviser: "At an
+expected annual turnover of X selling Y to consumers in Z, when must we register for VAT or sales tax, which
+rate applies to this product, and must our displayed price include it?" Payment terms, deposits, and
+subscription cancellation rules can carry consumer law obligations; ask a solicitor or attorney: "Are our
+deposit, refund, and cancellation terms for consumers in Z enforceable, and what must we disclose before
+checkout?"
+
+It does not produce statutory accounts or a cash flow statement for filing. That goes to `finance-books`
+and an accountant.

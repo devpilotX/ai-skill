@@ -1,131 +1,180 @@
 ---
 name: mobile-build
-description: Build mobile applications that survive a bad network, a backgrounded process and a store review. Use when the user asks to build an iOS or Android app, asks about Swift, SwiftUI, Kotlin, Jetpack Compose, React Native, Flutter or Expo, asks about offline support, push notifications, app store submission, permissions, deep links, or asks why their app is rejected, slow, or draining battery. Treats the network as unreliable by default, plans the offline and conflict behaviour before the screens, budgets battery and data, and covers the store review rules that cause most rejections. Names the minimum supported version and the device class being targeted before any code. Triggers on build an iOS app, build an Android app, React Native, Flutter, SwiftUI, Jetpack Compose, offline support, push notifications, app store rejection, deep linking, mobile performance, battery drain.
+description: Build mobile applications that survive a bad network, a killed process, a store review and a release you cannot roll back. Use when the user asks to build an iOS or Android app, asks about Swift, SwiftUI, Kotlin, Jetpack Compose, Kotlin Multiplatform, React Native, Flutter or Expo, asks about offline support, push notifications, permissions, deep links, universal links, secure token storage or Keychain, in-app purchase, TestFlight, Play Console, or app store submission, or says the app was rejected by Apple, crashes on launch, is slow, or drains battery. Plans offline behaviour first, keeps secrets out of the binary, plans for old versions living for years, and retrieves current store rules. Triggers on build an iOS app, build an Android app, app store rejection, rejected by Apple, deep linking, forced update, mobile performance, battery drain. For staged rollout and release trains use release-manage; for web apps use frontend-build.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Mobile build
 
-Mobile differs from web in four ways that change the design: the network fails constantly, the operating
-system can kill your process, distribution goes through a reviewer, and the battery is a shared resource
-the user notices.
+The failure this corrects: building a mobile app as if it were a web app. A web deploy can be reverted in
+minutes. A shipped binary stays on phones for years, runs against your API long after you changed it,
+gets killed by the operating system mid task, and has to pass a reviewer before any fix reaches users.
+
+## When to use and when to stay off
+
+Run when the user is building, architecting, debugging or submitting a native or cross platform mobile
+app, or choosing between native, cross platform and an installable web app.
+
+Stay off for a responsive website or a web app that will never be packaged for a store; that goes to
+`frontend-build`. Stay off for a pure store listing copy question with no technical consequence.
+
+Routing. Phased rollout, release trains, versioning and rollback plans go to `release-manage`. Threat
+modelling, attestation backends and credential handling in depth go to `security-hardening`. The API the
+app talks to, including versioning and the minimum version endpoint, goes to `backend-build`.
+
+The user says "stop", "I've decided", or "just execute": comply at once and stay off for the rest of the
+session unless asked again.
 
 ## Non-negotiables
 
-1. Decide the offline behaviour before building screens. Read only cache, queued writes, or full sync with conflict resolution are three different applications. Retrofitting the third is close to a rewrite.
-2. Assume the process is killed at any moment. Anything not persisted is gone. State restoration is a requirement, not a refinement.
-3. Never ship a secret in the binary. A mobile app is a client in someone else's hands and can be unpacked. API keys, private keys and signing secrets belong on a server.
-4. State the minimum supported operating system version and the oldest target device, and check the feature availability of every API against it. Recall about platform version support is often wrong, so retrieve it.
-5. Request a permission at the moment it is needed, with an explanation, never all at once on launch. Denial is a normal path that has to work.
-6. Verify on a real device on a slow connection. A simulator on a fast desktop hides almost every problem that matters.
-7. Read the current store review guidelines before submission rather than recalling them, since they change and rejection costs a review cycle.
+These override everything else in this file.
+
+1. Decide the offline behaviour before building screens. Read only cache, queued writes, and full sync with conflict resolution are three different applications.
+2. Assume the process is killed at any moment. Anything not persisted is gone.
+3. No secret in the binary. Third party API keys go behind your own backend proxy. Tokens go in the Keychain on iOS and the Keystore backed encrypted storage on Android, never in AsyncStorage, SharedPreferences or UserDefaults.
+4. A shipped binary cannot be rolled back. Ship crash reporting, a server driven minimum version check, and backward compatible APIs before the first release.
+5. State the minimum OS version and oldest target device, and retrieve API availability and current store floors for them. Recall about platform versions and store rules is often wrong.
+6. Request each permission at the moment it is needed, with an explanation. Denial is a normal path that has to work.
+7. Verify the release build on a real device on a slow connection.
 
 ## Procedure
 
 ### Step 1, decide the platform strategy honestly
 
-Native, meaning Swift or Kotlin, gives the best performance, immediate access to new platform features,
-and the best debugging. It costs two codebases when both platforms are needed.
+Native (Swift, Kotlin) gives the best performance, first access to new platform features, and the best
+debugging. It costs two codebases when both platforms are needed.
 
-React Native and Flutter share most logic across platforms and are a good fit for interface heavy
-applications. They cost a bridge or an engine, a harder path for platform specific features, larger
-binaries, and dependence on the ecosystem keeping up with platform releases.
+React Native and Flutter share most code and suit interface heavy apps. React Native's New Architecture
+(JSI, Fabric, TurboModules) is the default since 0.76, so native calls no longer go through the old
+asynchronous bridge. The costs that remain for both are a harder path to platform specific features,
+larger binaries, and waiting on the framework and its libraries after each OS release. Check that every
+native library you need supports the architecture you are on. Kotlin Multiplatform shares business logic
+and keeps native UI on each side.
 
-A web application installed to the home screen is far cheaper and is limited in background work, push
-support on some platforms, and hardware access.
+An installable web app is far cheaper. iOS supports Web Push for web apps added to the Home Screen since
+iOS 16.4, and not in a browser tab. Background work and hardware access stay limited on both platforms.
 
-Pick on the constraint that actually binds: team skill, the platform features required, and whether one
-or two platforms must ship. Say which constraint decided it.
+Pick on the constraint that binds: team skill, required platform features, and whether one or two
+platforms must ship. Say which constraint decided it.
 
 ### Step 2, plan data and sync first
 
-List what the user can do with no connection. That list determines the storage design.
+List what the user can do with no connection. That list sets the storage design.
 
-For queued writes, decide the conflict rule now. Last write wins is simple and loses data silently.
-Server authority is predictable and can discard user work. Merge is correct and the most work. Say which
-one, and say what the user sees when their change is rejected.
+For queued writes, decide the conflict rule now. Last write wins loses data silently. Server authority
+can discard user work. Merge is correct and the most work. Say what the user sees when a change is
+rejected.
 
-Give every queued operation an idempotency key, because retries after a reconnect are certain.
+Give every queued operation an idempotency key. Store queued work durably. Show sync state in the
+interface.
 
-Store queued work durably, not in memory, since the process will be killed before the network returns.
+### Step 3, plan for versions you cannot recall
 
-Show sync state in the interface. A user who cannot tell whether their change was saved will retry it.
+Old versions keep running for years. Every API change the app depends on must stay backward compatible,
+or be versioned, for as long as the oldest supported build is in use.
 
-### Step 3, build for interruption
+Add a minimum supported version check at launch, driven by the server, with a soft prompt and a hard
+block. It is the only way to retire a build with a security bug.
 
-Save draft input as it is typed, not on submit.
+Ship crash reporting and symbol upload from the first build, so a crash on launch in the field is
+diagnosable. Release through phased rollout on the App Store and staged rollout in Play Console, and halt
+when crash-free sessions drop. Rollout mechanics are in `release-manage`.
 
-Restore scroll position, navigation stack and partially entered forms after a cold start.
+### Step 4, build for interruption and background limits
 
-Handle a resume after minutes, hours or days. Tokens will have expired and cached data will be stale.
+Save draft input as it is typed. Restore navigation, scroll position and forms after a cold start.
 
-Handle rotation, split screen, and a phone call arriving mid action.
+Handle a resume after days: tokens expired, cached data stale.
 
-Handle the app being opened from a notification or a deep link into an arbitrary screen, with no
-navigation history behind it.
+Handle a launch from a notification or deep link into an arbitrary screen, with no navigation history.
 
-### Step 4, respect the shared resources
+Background work is not guaranteed. iOS `BGTaskScheduler` runs tasks when the system chooses, possibly
+never. Android Doze and App Standby defer work; use WorkManager for deferrable work. Android 14 requires a
+declared foreground service type and matching permission for every foreground service. Design so a task
+that never ran in the background runs on next launch.
 
-Network. Batch requests, deduplicate them, and cache with a stated freshness. Every wake of the radio
-costs battery. Give every request a timeout and a retry with backoff.
+### Step 5, security on the device
 
-Battery. Background work belongs in the platform's scheduler so the system can batch it, not in a timer.
-Location at the lowest accuracy that works, and never continuously without a visible reason.
+Tokens and keys: Keychain on iOS, Android Keystore (directly or through an encrypted storage library that
+uses it). Plain preferences files and AsyncStorage are readable on a rooted or backed up device.
 
-Data. Assume a metered connection. Size images for the device, and avoid downloading what is not shown.
+Keys for third party services go on your server, and the app calls your server. To make it harder for
+scripts to impersonate the app, use App Attest or DeviceCheck on iOS and the Play Integrity API on Android,
+verified on the server. Attestation raises cost for an attacker, it does not make the client trusted.
 
-Storage. Cap the cache and evict. An application that grows without limit gets deleted.
+Deep links. Use Universal Links (an `apple-app-site-association` file on your domain) and Android App Links
+(`assetlinks.json` under `/.well-known/`, with `autoVerify`). Custom URL schemes can be registered by any
+app and hijacked. Treat every link parameter as untrusted input: validate it, and never perform an action
+such as a payment or login from a link without confirmation.
 
-Memory. Large images are the usual cause of a termination. Downsample before display.
+### Step 6, notifications
 
-### Step 5, the paths that get skipped
+Android 13 and later need the `POST_NOTIFICATIONS` runtime permission. iOS needs authorisation before
+alerts show. Ask in context, after the user has a reason to say yes, and keep the feature usable when
+refused.
 
-Permission denied, and permission granted then revoked later in settings.
+Push tokens change. Handle the refresh callback (FCM `onNewToken`, the APNs registration callback on
+every launch) and update the server, or delivery fails silently.
 
-Notification permission refused, with the feature still usable.
+### Step 7, respect the shared resources
 
-Storage full.
+Network: batch, deduplicate, cache with a stated freshness, timeout and retry with backoff.
 
-No network at launch, meaning the very first run with nothing cached.
+Battery: background work through the platform scheduler; location at the lowest accuracy that works.
 
-Token expired while backgrounded.
+Data: assume a metered connection and size images for the device.
 
-Operating system version older than the newest API used.
+Storage: cap the cache and evict. Memory: downsample large images before display.
 
-Accessibility: platform screen reader, larger text sizes, and reduced motion. Dynamic type breaks fixed
-height layouts, which is the most common mobile accessibility defect.
+### Step 8, the paths that get skipped
 
-### Step 6, submission
+Permission denied, or granted then revoked in settings. Storage full. No network on first run. Token
+expired while backgrounded. OS older than the newest API used.
 
-Check the current guidelines at the source: the
+Accessibility: screen reader labels, reduced motion, and large text. Test the largest Dynamic Type sizes
+on iOS and the largest font scale on Android, since fixed height layouts clip text at both.
+
+### Step 9, submission
+
+Read the current rules at the source on the day you submit: the
 [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) and
-[Google Play policies](https://play.google.com/about/developer-content-policy/). The recurring rejection
-causes are a missing or incorrect privacy declaration, payment for digital goods outside the platform
-system, incomplete metadata, a login wall with no demo account, requesting permissions with no visible
-purpose, and crashes on the reviewer's device.
+[Google Play policies](https://play.google.com/about/developer-content-policy/). Rejection causes per store,
+the privacy manifest, App Tracking Transparency, the Play data safety form, account deletion, SDK and
+target API floors, in-app purchase rules, and a reviewer notes template are in
+`references/store-review.md`.
 
-Prepare the privacy declaration from what the application actually collects, including what third party
-software development kits collect, which is frequently more than the developer knows.
+If the app lets users create accounts, both stores require in-app account deletion, and Google Play also
+requires a web link where users can request deletion without the app installed.
 
-Provide a working test account and steps for anything behind a login.
-
-Include the account deletion path if accounts can be created, which is now required on both stores.
-
-Test the release build, not the debug build. They differ in optimisation, logging and sometimes
-behaviour.
+Test the release build, not the debug build.
 
 ## Self-audit
 
-- Offline behaviour and conflict rule decided and written down.
-- Queued work durable and idempotent.
+- Offline behaviour and conflict rule written down; queued work durable and idempotent.
 - State restored after a process kill.
-- No secret in the binary.
-- Minimum version stated, and every API checked against it.
-- Permissions requested in context, with the denial path working.
-- Tested on a real device on a throttled connection.
-- Dynamic type and screen reader checked.
-- Current store guidelines read, not recalled.
-- Release build tested, with a demo account prepared.
+- No secret in the binary; third party keys behind a proxy; tokens in Keychain or Keystore.
+- Crash reporting, server driven minimum version, and backward compatible APIs in place before release.
+- Phased or staged rollout planned, with a halt condition.
+- Minimum OS stated; current SDK and target API floors retrieved, with the date.
+- Background work tolerates never running; Android 14 foreground service types declared.
+- Deep links verified by domain; link parameters validated.
+- Notification permission requested in context; token refresh handled.
+- Largest Dynamic Type and Android font scale checked, with screen reader.
+- Privacy manifest, ATT and data safety form match what the app and its SDKs collect.
+- Account deletion in app, plus the web deletion link for Google Play.
+- Release build tested on a real device, with a demo account prepared.
+
+## What this cannot do
+
+It cannot tell you the current store rules, SDK floors, or fees from memory with confidence. Those change
+yearly, so it will tell you where to retrieve them.
+
+It cannot predict a specific reviewer's decision. Reviews vary, and an appeal is sometimes the only path.
+
+It does not give legal advice on privacy law or payment rules. For an app handling health, children's or
+financial data, or selling digital goods through an external payment link, ask a lawyer who handles app
+store and privacy matters: "Given the data this app collects and the regions it ships to, which consent,
+disclosure and payment rules apply, and does our store listing and in-app flow satisfy them?"

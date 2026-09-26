@@ -1,137 +1,202 @@
 ---
 name: job-hunt
-description: Run a job search as a targeted operation instead of a volume application exercise. Use when the user asks for help finding a job, applying for roles, writing or fixing a CV or resume or cover letter, preparing for interviews, answering a job description, negotiating an offer or salary, or asks why they are getting no responses or no interviews. Also use for outreach messages and referral requests. Diagnoses where the funnel is actually failing before fixing anything, rewrites applications around evidence rather than adjectives, builds a shortlist of specific employers with a route to a human at each, and prepares negotiation with retrieved pay data rather than guesses. Triggers on help me find a job, fix my resume, fix my CV, cover letter, why am I getting no interviews, interview prep, salary negotiation, how do I apply, job search strategy, LinkedIn message.
+description: Run a job search as a targeted operation, not a volume exercise. Use when the user wants help finding a job, applying, fixing a CV, resume, LinkedIn profile or portfolio, getting past an ATS, preparing for interviews including one-way video, answering a recruiter, negotiating salary, handling an exploding or rescinded offer or reneging, checking whether a recruiter or offer is a scam, or asks why they keep getting rejected, ghosted, or no interviews. Diagnoses which funnel stage is failing before fixing anything, rewrites applications around evidence, builds a shortlist with a human route per employer, and negotiates with retrieved pay data and local pay transparency rules. For whether to take a job or change career use career-strategy. For cover letter prose that reads machine-written use human-prose. Triggers on help me find a job, fix my resume, fix my CV, ATS, cover letter, rejected, ghosted, recruiter, LinkedIn profile, portfolio, interview prep, salary negotiation, is this job a scam, reneging.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Job hunt
 
-A job search is a funnel with four stages. Fixing the wrong stage wastes months, so the first job is
-finding out which stage is broken.
+The failure this corrects is fixing the wrong stage of a job search: rewriting a CV forty times when
+the targeting, the recruiter screen or the interviews are what is breaking. A search is a funnel with
+five stages (applications, first responses, first interviews, final stages, offers), so there are four
+transitions that can fail plus the quality of the offers. The first job is finding out which one is
+broken.
 
-## Diagnose before fixing
+## When to use and when to stay off
 
-Ask for the numbers from the last thirty days. Applications sent, first responses, first interviews,
+Run when the user is looking for work, applying, preparing for interviews, dealing with recruiters, or
+handling and negotiating an offer.
+
+Stay off when:
+
+- The question is whether to take a job, change career, go freelance, or accept a counteroffer. `career-strategy` takes that decision; this skill executes it.
+- The user wants a cover letter or profile rewritten so it stops reading as machine-written. `human-prose` takes the prose; this skill keeps the content and targeting.
+- The user wants a CV or portfolio exported as a formatted document. `doc-forge` takes the formatting.
+- The question is legal, such as whether a non-compete binds them or whether an employer broke a pay transparency law. Hand over the question for the professional named in "What this cannot do".
+
+The user says "stop", "I've decided", or "just execute": comply at once and stay off for the rest of
+the session unless asked again.
+
+## Non-negotiables
+
+These override everything else in this file.
+
+1. No invented employment history, dates, titles, qualifications, or metrics. Fabrication on an application can be grounds for dismissal after hiring, and this skill does not help with it.
+2. Every claim on a CV needs evidence the user can defend in an interview. If they cannot explain the number, it comes out.
+3. Never invent salary data or legal rules. Retrieve pay for the country, city, level and year with a link and a date, or label it an estimate. Retrieve the current pay transparency and salary history rules for the user's jurisdiction.
+4. Screen for scams before the user sends documents, money or identity details. Walk through the red flags in `references/negotiation-and-conventions.md` whenever a recruiter or offer arrives unsolicited.
+5. Tell the user when the market or the target is the problem instead of the documents, with evidence.
+
+## Procedure
+
+### Step 1, diagnose the funnel
+
+Ask for the numbers from the last thirty days: applications sent, first responses, first interviews,
 final stages, offers. The ratios locate the problem, and each problem has a different fix.
 
-Many applications and almost no responses means the targeting or the written application is wrong, or the
-applications are going through a channel with no human at the end. This is the most common case and
-volume is not the fix.
+Many applications and almost no responses means the targeting or the written application is wrong, or
+the applications are going into a channel with no human at the end. Volume is not the fix.
 
-Responses but no first interview means the CV opens well and does not survive scrutiny, usually because it
-claims responsibilities without evidence of outcomes.
+Responses but no first interview means the recruiter screen is failing. The CV already did its job by
+producing the response. Look at the screening call: pay expectations out of range, work authorisation
+or location answers, notice period, or a pitch that does not connect the user to the role.
 
 Interviews but no final stages means the technical or competency answers are not landing, or the
 preparation is generic.
 
-Final stages but no offers means competition at the last step, a reference problem, or a mismatch that
-only becomes visible late. Ask for feedback explicitly, because at this stage it is sometimes given.
+Final stages but no offers means competition at the last step, a reference problem, or a mismatch
+that only becomes visible late. Ask for feedback explicitly.
 
 Offers but bad ones means the targeting is too low or the negotiation is being skipped.
 
-Never start rewriting a CV before doing this. Fixing a document that was never the constraint is the most
-common wasted effort in a job search.
+Ghosting at any stage is normal noise in small numbers. A pattern of it at one stage is a signal about
+that stage.
 
-## Non-negotiables
+### Step 2, define the target precisely
 
-1. No invented employment history, dates, titles, qualifications, or metrics. Ever. Fabrication on an application is grounds for dismissal after hiring and it is not a thing this skill helps with.
-2. Every claim on a CV needs evidence the user can defend in an interview. If they cannot explain the number, it comes out.
-3. Never invent salary data. Retrieve it for the country, city, level, and year, with a link and a date, or label it as an estimate.
-4. Volume is a last resort, not a strategy. Twenty targeted applications with a human contact beat four hundred submitted through a portal.
-5. Tell the user when the market, not the application, is the problem. Retrieve evidence rather than guessing, and do not let them rewrite a CV forty times when the issue is that they are applying for roles that require a credential they do not have.
+Narrow to a role, a level, an industry, a geography or remote arrangement, and a company size band. A
+five person company, a two hundred person company and a large enterprise want different evidence and
+run different processes.
 
-## Procedure
-
-### Step 1, define the target precisely
-
-A search for "any developer job" produces nothing usable. Narrow to a role, a level, an industry, a
-geography or remote arrangement, and a company size band.
-
-Company size matters more than most people expect. A five person company, a two hundred person company,
-and a large enterprise want different evidence and run different processes.
+Apply work authorisation as a filter before anything else. If the user needs sponsorship, target
+employers that sponsor for that role and country, and check the official register where one exists,
+such as the UK Home Office register of licensed sponsors. Remote roles often still require the right
+to work in a named country.
 
 Then name the industry where the user's existing domain knowledge is worth money. Someone leaving
-logistics for software is far more valuable to a logistics software company than to a general one, and the
-same CV performs differently at each.
+logistics for software is worth more to a logistics software company than to a general one.
 
-### Step 2, build a real shortlist
+### Step 3, build a real shortlist
 
-Twenty to forty named employers, not job boards. Include companies not currently advertising, because a
-large share of hiring happens before a posting exists.
+Twenty to forty named employers, not job boards. Include companies not currently advertising.
 
-For each one, find a route to a human: a specific person, a mutual connection, a community, a conference, a
-former colleague. An application with an internal referral is processed differently from one without,
-which is the single largest lever in the whole process.
+For each one, find a route to a human: a specific person, a mutual connection, a community, a former
+colleague. A referral usually changes how an application is processed, and it is the largest lever the
+user controls. Record the route next to each name.
 
-Record the route next to each name. A shortlist with no routes is a list of hopes.
+Check each employer and recruiter is real before engaging: the company domain on the email, the role
+on the company's own careers page, and the recruiter's history. Scam patterns are in
+`references/negotiation-and-conventions.md`.
 
-### Step 3, rewrite the application around evidence
+### Step 4, rewrite the application around evidence
 
-Structure each bullet as the situation, the action taken, and the measurable result. Cut every adjective
-about the user and replace it with the thing that demonstrates it.
+CV bullets are an action plus a quantified result. "Cut page load from 4.2 seconds to 1.1 by moving
+image processing off the request path." Cut every adjective about the user and replace it with the
+thing that demonstrates it. Save the situation, action, result shape for interview stories in step 5.
 
-Replace "excellent communicator" with the thing that proves it, such as running the weekly review for
-three teams. Replace "improved performance" with the number, meaning the page load went from 4.2 seconds
-to 1.1. Replace "extensive experience" with the duration and the scale.
+Mirror the vocabulary of the job description where it is honest, because the first filter is often an
+applicant tracking system (ATS) keyword match and the second is a human who recognises their own
+words. Use a plain layout the ATS can parse: standard headings, no text inside images, no tables for
+core content.
 
-Mirror the vocabulary of the job description where it is honest, because the first filter is often keyword
-based and the second is a human who recognises their own words.
+Length, photographs, personal details and format are local conventions. A one page resume early in a
+career is a US convention; two pages is common for a UK CV; academic CVs run long with publications;
+German applications often use a tabular Lebenslauf with conventions of its own. Treat these as
+conventions to check for the target country and sector, using `references/negotiation-and-conventions.md`.
 
-One page for under ten years of experience, two at most beyond that. Reverse chronological. No photograph
-unless the local convention expects one, since conventions differ by country and getting this wrong is a
-silent filter.
+LinkedIn profile and portfolio follow the same rule: headline says the target role, the top items show
+evidence, and every project names what the user personally did.
 
-Cover letters: three short paragraphs. Why this employer specifically, meaning something only someone who
-looked would know. What the user has done that maps to the stated problem. What they want. No restating
-the CV.
+Cover letters: three short paragraphs. Why this employer, meaning something only someone who looked
+would know. What the user has done that maps to the stated problem. What they want. For prose that
+reads machine-written, hand to `human-prose`.
 
-### Step 4, prepare for interviews with specifics
+If AI helped draft any material, every claim still has to be the user's and defensible. Some employers
+ask candidates to disclose AI use or ban it in assessments; follow the employer's stated policy and
+answer honestly when asked.
 
-Write six stories in the situation, action, result shape, covering a conflict, a failure, a decision made
-with incomplete information, something taught to someone else, something shipped under pressure, and
-something they were wrong about. Six stories cover most competency questions.
+### Step 5, prepare for interviews with specifics
 
-For technical roles, practise out loud and against a clock, because the gap between knowing and explaining
-under time pressure is where most candidates lose.
+Write six stories in the situation, action, result shape, covering a conflict, a failure, a decision
+made with incomplete information, something taught to someone else, something shipped under pressure,
+and something they were wrong about.
 
-Prepare questions that only someone who researched the company would ask. Generic questions at the end
-signal generic interest.
+For technical roles, practise out loud and against a clock.
 
-Rehearse the failure story honestly. An unconvincing failure story is worse than a real one.
+For one-way recorded video and AI-screened interviews, practise to a camera with the same time limits,
+answer the question asked in the first sentence, and check the setup beforehand. Ask whether
+retakes are allowed and how the recording is assessed. Some jurisdictions regulate these tools, for
+example the Illinois Artificial Intelligence Video Interview Act and New York City Local Law 144 on
+automated employment decision tools; retrieve the current rules for the user's location. Ask for an
+adjustment if a disability affects the format.
 
-### Step 5, negotiate
+Take-home assignments: ask for the expected time before starting, and decide a cap in advance.
+Decline or ask to be paid when the task looks like real production work for the employer, and keep a
+copy of what was submitted.
 
-Never give the first number when it can be avoided. Where a range is required, give a researched range
-with the source, anchored at the upper end of what the data supports.
+Prepare questions that only someone who researched the company would ask. Rehearse the failure story
+honestly.
 
-Retrieve comparable pay for the role, level, city, and year. Cite it with a date. Local pay data goes
-stale within a year.
+### Step 6, negotiate
 
-Negotiate the whole package, meaning base, bonus structure, equity with its actual terms, pension
-contribution, holiday, notice period, remote arrangement, equipment, training budget, and start date.
-Several of these cost the employer less than base and are easier to grant.
+Check the rules for the user's jurisdiction first, using `references/negotiation-and-conventions.md`:
 
-Ask for time to consider, in writing, always. An offer that cannot survive two days of consideration is a
-warning.
+- Several US states and cities require a pay range in job postings or on request. Where a range is posted, it is the anchor, and the user can negotiate within or above it with evidence.
+- Many jurisdictions ban employers from asking about salary history. Where a ban applies, the user can decline to answer.
+- The EU Pay Transparency Directive, [Directive (EU) 2023/970](https://eur-lex.europa.eu/eli/dir/2023/970/oj/eng), requires employers to give candidates the starting pay or its range before the interview and bars questions about pay history. Member states had to transpose it by 7 June 2026; check the national law in force.
 
-Get it in writing before resigning. Verbal offers get withdrawn.
+Where no range is disclosed and no rule applies, avoid naming the first number when possible. Where a
+number is required, give a researched range with its source, anchored at the upper end of what the
+data supports.
 
-### Step 6, track and review
+Retrieve comparable pay for the role, level, city and year, cited with a date.
 
-A simple table of employer, route, date contacted, stage, and next action. Review weekly, and recompute
-the funnel ratios monthly.
+Negotiate the whole package: base, bonus structure, equity with its terms, pension contribution,
+holiday, notice period, remote arrangement, equipment, training budget, start date. Whether the
+package is worth taking goes to `career-strategy`.
 
-If a stage has not moved in three weeks, the approach at that stage is wrong. Change one thing at a time
-so the cause of any improvement is identifiable.
+Ask for time to consider, in writing. An exploding offer with a deadline of a day or two is a pressure
+tactic; ask for an extension and treat a refusal as information.
+
+Do not resign until the offer is written and its conditions are cleared: background check, references,
+right to work, and any medical or credential checks. Offers get rescinded, and a conditional offer is
+not yet a job. Ask what the background check covers and when references will be contacted, and tell
+current referees before they are called.
+
+Reneging on an accepted offer has costs: the relationship with that employer and recruiter, any signed
+contract terms, and sign-on repayment. Read the contract notice terms, tell the employer promptly and
+in writing, and do not keep two acceptances open.
+
+### Step 7, track and review
+
+A table of employer, route, date contacted, stage, and next action. Review weekly, and recompute the
+funnel ratios monthly.
+
+If a stage has not moved in three weeks, the approach at that stage is wrong. Change one thing at a
+time so the cause of any improvement is identifiable.
 
 ## Self-audit
 
-- The funnel was diagnosed before anything was rewritten.
-- Every CV claim has defensible evidence behind it.
+- The funnel was diagnosed before anything was rewritten, and a response-without-interview pattern was treated as a screen problem.
+- Work authorisation and sponsorship were applied as a targeting filter.
+- Every CV claim has defensible evidence behind it, written as action plus quantified result.
 - Nothing is fabricated, including dates and titles.
-- The shortlist has a named human route per employer.
+- Length, photo and format follow a checked local convention, not a default.
+- The shortlist has a named human route per employer, and each employer and recruiter was checked for scam signs.
 - Salary figures carry a source and a date, or are labelled as estimates.
-- If the real problem is the target rather than the documents, that was said plainly.
+- Pay transparency and salary history rules for the user's jurisdiction were checked before advising on the first number.
+- The user was told not to resign until a written offer with conditions cleared.
+- If the real problem is the target, that was said plainly.
+
+## What this cannot do
+
+It cannot guarantee interviews or offers, see inside an employer's ATS or scoring, or confirm a
+recruiter is genuine beyond the checks listed. It is not legal or immigration advice:
+
+- Employment lawyer: "The posting for (role) in (location) had no pay range and the recruiter asked my current salary. Did the employer break a pay transparency or salary history rule, and what can I do?"
+- Employment lawyer: "My offer was rescinded after I resigned (or I want to withdraw my acceptance). What are my rights and liabilities under this contract and local law?"
+- Immigration lawyer: "Can I start this role on my current permit, and does the employer need to sponsor me?"
+- If a scam has already taken money or identity documents: report it to the bank at once and to the national fraud reporting body, such as ReportFraud.ftc.gov in the US or Action Fraud in the UK.

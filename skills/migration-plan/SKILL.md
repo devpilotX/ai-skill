@@ -1,126 +1,167 @@
 ---
 name: migration-plan
-description: Move a system from one technology, provider or version to another without a cutover weekend. Use when the user asks how to migrate, port or move between databases, frameworks, languages, cloud providers, authentication systems or major versions, asks how to escape a vendor, asks about zero downtime data migration, dual writing or backfilling, or asks whether to upgrade or replace. Plans an incremental path with both systems running and traffic moved in slices, requires a tested reversal at every step, makes correctness verifiable by comparing the two systems on live traffic, and states the cost of the parallel running period that big bang plans leave out. Triggers on migrate from, port to, move off, switch database, upgrade major version, zero downtime migration, dual write, backfill, vendor lock in, replatform, cutover.
+description: Move a system from one technology, provider or version to another without a cutover weekend. Use when the user asks how to migrate, port or move between databases, frameworks, languages, cloud providers, authentication systems or major versions, how to escape a vendor, asks about zero downtime data migration, dual writing, change data capture, shadow traffic, backfilling, the strangler fig pattern, or whether to upgrade or replace. Plans an incremental path with both systems running, traffic moved in reversible slices, correctness checked against a stated mismatch tolerance, and the parallel running cost stated. Schema migrations inside one database go to data-layer. Rewrite or refactor of the same codebase goes to refactor-safely. Triggers on migrate from, port to, move off, move to AWS, leave Heroku, Firebase to Postgres, Python 2 to 3, switch database, upgrade major version, zero downtime migration, dual write, change data capture, CDC, shadow traffic, strangler fig, backfill, vendor lock in, cutover.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Migration planning
 
-A single cutover concentrates all the risk into one irreversible moment, usually at night, with a tired
-team. The alternative is running both systems and moving traffic in slices, each one reversible.
+A single cutover concentrates all the risk into one irreversible moment, and incremental
+plans can fail more quietly: dual writes that diverge without anyone noticing, a comparison that never
+reaches zero so reads move anyway, a backfill that overwrites fresher data, and an exit bill nobody
+retrieved. This skill corrects both by running the two systems in parallel, moving traffic in
+reversible slices, and making every consistency mechanism say what happens when one side fails.
+
+## When to use and when to stay off
+
+Run when a system, datastore, provider, framework, language or authentication system is being replaced,
+or when a major version jump is large enough to plan.
+
+Stay off, and route instead, when:
+
+- The change is a schema migration inside one database (adding a column, splitting a table, an index). Use `data-layer`.
+- The code stays on the same stack and the question is whether to rewrite or restructure it. Use `refactor-safely`.
+- The target has not been chosen yet. Use `arch-decide` first, and come back with the decision.
+- The question is only how to roll out a release. Use `release-manage`.
+
+The user says "stop", "I've decided", or "just execute": comply at once and stay off for the rest of
+the session unless asked again.
 
 ## Non-negotiables
 
-1. Every step is reversible on its own. If a step cannot be undone, it gets split until it can, or it is scheduled as a known point of no return with its own preparation.
-2. Both systems run in parallel during the transition, and that cost is stated in money and in attention. Plans that omit it are the ones that get approved and then abandoned halfway.
-3. Correctness is verified by comparison on live traffic, not by hoping. Shadow reads, then compare, then report the mismatch rate.
-4. A tested restore exists before any data is moved, and it was tested on this data.
-5. The deadline for finishing the transition is part of the plan. A migration that stalls at eighty percent leaves two systems to maintain forever, which is worse than either alone.
-6. Never migrate and redesign at the same time. Move first, improve after. Combining them means a failure cannot be attributed and the comparison is impossible.
-7. Retrieve the target's actual limits and behaviour rather than assuming parity. Different engines and providers differ in ways that break assumptions, and recall is not verification.
+These override everything else in this file.
+
+1. Every step is reversible on its own, or it is split until it is, or it is scheduled as a named point of no return with its own checklist.
+2. Every mechanism that keeps two systems in step states what happens when one write succeeds and the other fails, and how the gap is found and repaired.
+3. Correctness is verified by comparison against a tolerance set before comparison starts, and reads move only when every mismatch class is explained.
+4. A tested restore exists before any data is moved, tested on this data.
+5. The parallel running cost is stated in money and attention, and the finish date is part of the plan.
+6. Never migrate and redesign at the same time. Move first, improve after.
+7. Retrieve the target's real limits, behaviour, and the source's exit and egress terms. Recall is not verification.
 
 ## Procedure
 
+Failure modes, comparison design, checklists and provider specifics are in `references/patterns.md`.
+
 ### Step 1, be honest about why
 
-Write the reason down, and check it survives scrutiny. Cost, a capability that is genuinely required, an
-unsupported version, or a limit being hit.
-
-Then ask whether an upgrade in place achieves it, because it usually costs a fraction of a migration.
-
-If the reason is that the current system is unpleasant to work with, a migration will not fix that for long.
-Say so.
+Write the reason down: cost, a required capability, an unsupported version, a limit being hit. Ask
+whether an upgrade in place achieves it, since that usually costs far less. If the reason is that the
+current system is unpleasant to work with, say a migration will not fix that for long.
 
 ### Step 2, inventory what depends on it
 
-This is the step that determines the true size, and skipping it is why migrations run over.
+Every reader and writer, including scripts, reports, dashboards, scheduled jobs, third party
+integrations, and internal tools. Search all of the organisation's code.
 
-Every reader and writer, including scripts, reports, dashboards, scheduled jobs, third party integrations,
-and the one internal tool nobody remembers. Search the whole organisation's code, not only the main
-application.
-
-Every behaviour depended upon that is not in the documentation: ordering guarantees, case sensitivity,
-collation, precision, null handling, timezone behaviour, identifier format, transaction isolation, and
-error codes. These are where migrations break, because both systems claim to do the same thing.
+Every undocumented behaviour depended upon: ordering, case sensitivity, collation, precision, null
+handling, timezones, identifier format and sequences, transaction isolation, error codes.
 
 Data volume and growth, which decides whether a backfill takes hours or weeks.
 
+For a provider move, the exit cost. Retrieve the current egress price and any export charges at the
+data size measured here, and the contractual exit terms. In 2024 some large cloud providers announced
+egress waivers for customers moving data off their platform, generally on request and with conditions;
+retrieve the current terms from the provider's own documentation instead of assuming they apply. Check
+the arithmetic with `numbers-check`.
+
 ### Step 3, prove it on a slice
 
-Before committing, take the hardest representative piece and make it work end to end against the target.
-Not the easiest piece. The one you are least sure about.
-
-This finds the incompatibility that changes the plan, while changing the plan is still cheap.
-
-Measure performance on real data volume. A target that is slower on the main query changes everything.
+Take the hardest representative piece and make it work end to end against the target. Measure
+performance on real data volume. This finds the incompatibility that changes the plan while changing it
+is cheap.
 
 ### Step 4, choose the pattern
 
-For data stores, dual write with shadow reads. Write to both, keep reading from the old one, read from the
-new one in parallel and compare without using the result. Report the mismatch rate, fix the causes, and
-only move reads when it is at zero for a sustained period. Then stop writing to the old one after a safety
-period during which returning is still possible.
+For data stores, pick how writes reach both systems, and state its failure semantics:
 
-For services and applications, put a routing layer in front and move one route, one feature or one cohort
-at a time. Each move is small, observable and reversible. The old system keeps serving everything not yet
-moved.
+- Application dual write, writing to both from the application, is not atomic. If the second write fails or the process dies between them, the stores diverge. Use it only with a repair path: record failed second writes durably and replay them, and run reconciliation to catch the ones that never got recorded.
+- Transactional outbox: write the change and an outbox row in one transaction on the old store, and a relay applies it to the new store. At least once, so the apply is idempotent.
+- Change data capture or log based replication: stream the old store's change log into the new one. No application change, and every committed write is seen.
+- Primary write plus asynchronous replay: write only to the old store and replay a durable log of operations into the new one, with lag monitored.
 
-For frameworks and languages, run the new one alongside for new code and migrate modules at boundaries,
-rather than converting everything then testing everything.
+Then shadow reads: keep serving from the old store, read from the new one in parallel, and compare
+without using the result.
 
-For major version upgrades, upgrade dependencies first, fix deprecation warnings on the current version
-next, then move. Most of the work is usually in the deprecations, and doing it before the jump keeps the
-steps separate.
+For services and applications, use a routing layer in front and move one route, feature or cohort at a
+time (the strangler fig pattern). Shadow traffic can exercise the new service first, as long as its side
+effects are blocked; see `release-manage`.
 
-For providers, move stateless compute first, data last, and check the egress cost before starting, since
-moving data out is frequently the largest single line in the whole project.
+For frameworks and languages, including Python 2 to 3, run the new one alongside for new code and
+migrate modules at boundaries.
 
-### Step 5, backfill carefully
+For major version upgrades, move one major version at a time, and read the changelog and upgrade guide
+for each one crossed. Upgrade dependencies first, fix deprecation warnings on the current version, then
+move. Skipping majors hides which change broke what.
 
-In batches, with a pause between them, and resumable from where it stopped.
+For authentication systems and provider moves, follow the specifics in `references/patterns.md`: hash
+formats and lazy rehash, session continuity, identifier mapping, DNS TTL and endpoint indirection.
 
-Record progress durably, so a restart does not begin again.
+### Step 5, set the tolerance and run the comparison
 
-Run it against production load and watch the effect. A backfill can saturate the database and cause the
-outage the migration was meant to avoid.
+Before comparing, write the tolerance: the unexplained mismatch rate allowed, over how many
+comparisons, for how long. Base it on what a wrong read costs the business, and label it `ASSUMPTION:`
+with its reasoning if nobody owns that figure.
 
-Verify by comparing counts and checksums per batch, not only at the end.
+Classify every mismatch (bug in the new path, bug in the old path, expected difference such as
+precision or ordering, timing of the comparison itself). Each class is explained and either fixed or
+accepted in writing. An unexplained class blocks the move regardless of its rate. Move reads only when
+no unexplained class remains and the residual rate stays inside tolerance for the agreed period.
 
-Handle the records that fail, and keep a list of them rather than letting them disappear into a log.
+Emit the mismatch counts as metrics through `observability-setup`, so the rate is watched and not
+sampled by hand.
 
-### Step 6, move traffic and keep the exit open
+### Step 6, backfill carefully
+
+In batches with a pause between them, resumable, with progress recorded durably. Watch production load,
+since a backfill can cause the outage the migration was meant to avoid.
+
+Guard against the race with live writes. Once dual writing or replication has started, a backfill that
+copies an old snapshot can overwrite a newer row. Make every backfill write a conditional upsert guarded
+by a version number or an update timestamp from the source, so it only writes when its copy is newer
+than what the target holds.
+
+Verify counts and checksums per batch. Keep a list of failed records and resolve each one.
+
+### Step 7, move traffic and keep the exit open
 
 Move in increments with a wait at each, watching error rate, latency and the business metric that proves
-the system works.
+the system works. Keep the way back open until the old system is genuinely no longer needed.
 
-Keep the ability to return until the old system is genuinely no longer needed, which is later than it
-feels.
+Name the point of no return, usually when writes stop going to the old system, and complete the point
+of no return checklist in `references/patterns.md` before passing it.
 
-Define the point of no return explicitly, and prepare for it specifically. Usually it is the moment writes
-stop going to the old system.
+### Step 8, finish it
 
-### Step 7, finish it
-
-Decommission on a date. Remove the dual write code, the comparison code, the routing shims and the flags.
-A migration that leaves its scaffolding behind has added complexity rather than removed it.
-
-Update the documentation and the runbooks, since the old ones now describe a system that no longer exists.
-
-Record what the migration actually cost against the estimate, because that is the only way the next
-estimate improves.
+Decommission on a date. Remove the dual write code, the comparison code, routing shims and flags.
+Update documentation and runbooks. Record actual cost against the estimate.
 
 ## Self-audit
 
 - The reason is written down, and upgrading in place was considered.
 - Full inventory of dependants, including scripts and reports outside the main application.
-- Undocumented behavioural dependencies listed and checked against the target.
-- The hardest slice proven end to end before committing.
+- Exit and egress terms were retrieved with a date, not recalled.
+- The write mechanism names its failure semantics and its repair or reconciliation path.
+- A mismatch tolerance was written before comparison started, and every mismatch class is explained.
+- Backfill writes are guarded by version or timestamp against overwriting newer data.
+- Major version upgrades cross one major at a time, with each changelog read.
+- Authentication moves cover hash format, session continuity and identifier mapping.
 - Restore tested on this data.
-- Comparison on live traffic with a reported mismatch rate.
-- Backfill batched, resumable, and verified per batch.
-- Every step reversible, with the point of no return named.
-- Parallel running cost stated.
-- Decommission date set, with scaffolding removal included.
+- The point of no return is named and its checklist completed.
+- Parallel running cost and a decommission date are stated.
+
+## What this cannot do
+
+It cannot see the data. Mismatch classes, volumes and backfill durations come from running the
+comparison, not from the plan.
+
+It cannot read the source provider's contract. Ask a technology contracts lawyer: "Under our agreement
+with this provider, what notice, fees and data return obligations apply when we leave, and are we
+entitled to any egress waiver they have announced?"
+
+When personal data moves between providers or regions, ask a data protection lawyer: "Does moving this
+personal data to this provider in these regions require a new transfer mechanism, an updated processor
+agreement, or notice to users?"

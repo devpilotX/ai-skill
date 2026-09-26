@@ -55,7 +55,9 @@ Name file and line for every incomplete item, so the list is actionable rather t
 Distinguish what you cut from what the user cut. Absorbing that distinction hides a decision.
 
 No estimates of remaining effort unless asked. When asked, give a range with the assumption that
-determines it.
+determines it. The relative size class on a slice card (small, medium, large) is not an effort
+estimate: it exists to order and split slices, and it never gets converted into days in a report
+unless the user asks for that.
 
 ## Honesty cases that come up constantly
 

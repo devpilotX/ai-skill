@@ -63,6 +63,9 @@ criteria that cannot be checked by someone who did not write them are not criter
 
 ## Decision record
 
+The skeleton records a decision; it does not make one. For a technical architecture choice, work the
+options, trade-offs, and exit paths through `arch-decide` first and bring the result here.
+
 ```
 # Decision: [the choice, stated as a decision not a question]
 
@@ -98,6 +101,7 @@ The reversal section is what makes the record useful a year later.
 
 Severity: [what is broken for whom]
 Owner: [team or person]
+Last verified: [ISO date the steps were last run end to end, and by whom]
 
 ## Confirm the symptom
 1. [command]
@@ -106,12 +110,16 @@ Owner: [team or person]
 
 ## Mitigate
 [Numbered steps. Stop the bleeding before diagnosing.]
+1. WARNING: destructive, [what it deletes or restarts and who notices]
+   [command]
+   Expected: [output]
+   Rollback: [the exact command that undoes this step]
 
 ## Diagnose
 [Numbered steps with commands and what each result means.]
 
 ## Resolve
-[Numbered steps.]
+[Numbered steps. Each step that changes state has a Rollback line.]
 
 ## Verify
 [How to confirm it is actually fixed, not just quiet.]
@@ -123,6 +131,11 @@ Owner: [team or person]
 Written for someone tired, under pressure, who did not build the system. Exact commands, copy and
 pasteable, with expected output after each. Mitigation comes before diagnosis, because stopping harm
 beats understanding it. No background prose anywhere.
+
+A warning line goes directly above any command that deletes data, restarts a service, fails over, or
+cannot be undone, so a tired reader sees it before pasting. Every step that changes state has a rollback.
+The last verified date tells the reader how far to trust the commands; a runbook not run end to end since
+the last infrastructure change is marked as unverified at the top.
 
 ## Release notes
 

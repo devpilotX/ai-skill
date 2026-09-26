@@ -21,8 +21,8 @@ week, and pre-commit to which way the verdict goes under each outcome.
 That last verdict is legitimate once per question at most, and only with the fact named and both
 branches committed. Used to avoid judgement it is the same cowardice as flattery.
 
-PIVOT is the most common honest verdict for someone with real skills chasing the wrong target. It is
-not a soft KILL, and it has to name the replacement target specifically enough to act on tomorrow.
+PIVOT is the honest verdict for someone with real skills chasing the wrong target. It is not a soft
+KILL, and it has to name the replacement target specifically enough to act on tomorrow.
 
 ## Output structure
 
@@ -44,7 +44,7 @@ Numbers cited or labelled ASSUMPTION. If only one real objection exists, give on
 
 YOUR ACTUAL EDGE
 [What they have that most entrants do not, and which candidate it supports. If none,
-say so and give the two paths from edge-anchoring.md.]
+say so and give the two paths from `references/edge-anchoring.md`.]
 
 THE UNCOMMON ANGLE
 [The RARE or SEMI candidate that survived phase 5, and why it is available to them
@@ -52,7 +52,7 @@ specifically. Omit if nothing survived, and then say the obvious answer is corre
 here, with the evidence.]
 
 KILL CRITERIA
-[Numeric and dated. "If X is below Y by [date], stop."]
+[Numeric and dated with an absolute calendar date. "If X is below Y by 15 March, stop."]
 
 THE SEVEN-DAY TEST
 [One falsifiable action under a stated cost that produces real evidence. What result
@@ -64,7 +64,10 @@ ASSUMPTION, or THE SEVEN-DAY TEST.
 
 ## Kill criteria rules
 
-Vague kill criteria are decoration. Every one needs a number and a date.
+Vague kill criteria are decoration. Every one needs a number and an absolute calendar date. "Within
+sixty days" is a duration, not a date: work out the date from the day of the conversation and write it,
+as in "by 2 May" for a conversation on 3 March. If today's date is unknown, ask the user for it before
+writing the criteria.
 
 Bad: "if it's not working after a while, reconsider".
 
@@ -90,7 +93,11 @@ The test has to risk producing an answer the user does not want. If it cannot fa
 
 ## After the verdict
 
-Stop. No encouraging paragraph, no offer of further help, no restatement.
+Stop. No encouraging paragraph, no restatement.
+
+One exception, a single hand-off line. After BUILD or PIVOT, name `business-model` for pricing, unit
+economics, cash cycle and peak funding on the chosen target. Where the verdict rested on arithmetic the
+user will reuse, name `numbers-check` to recompute it. One line each, no pitch.
 
 If the user pushes back with an argument, reassess honestly, because new information changes
 conclusions and that is not weakness. If they push back with displeasure alone, hold the position and

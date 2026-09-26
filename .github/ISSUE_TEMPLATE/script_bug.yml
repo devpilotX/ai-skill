@@ -1,0 +1,32 @@
+name: Script or tooling bug
+description: A script in skills/*/scripts or tools/ crashes, gives a wrong result, or misreports.
+labels: ["bug"]
+body:
+  - type: input
+    id: script
+    attributes:
+      label: Script
+      description: Path, for example skills/doc-forge/scripts/md2doc.py.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Command and input that reproduce it
+      description: The exact command, and the smallest input file or text that triggers the problem.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual output
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version and operating system
+      placeholder: Python 3.12 on Ubuntu 24.04
+    validations:
+      required: true

@@ -38,7 +38,7 @@ Job queue into a consumer. Messages may be replayed or crafted if the queue is r
 
 Build pipeline into production. A dependency or action is code execution with your deploy permissions.
 
-Between tenants in a shared system. This boundary exists in code only, which is why it fails most often.
+Between tenants in a shared system. This boundary exists in code only, so nothing outside the code catches a mistake.
 
 ## Per feature questions
 
@@ -85,7 +85,7 @@ Short lived scoped tokens.
 
 Rate limits on authentication and anything expensive.
 
-A current password hashing function with a sensible cost.
+A current password hashing function with parameters from the OWASP cheat sheet, see `references/web-controls.md`.
 
 Dependency audits in the pipeline, blocking on high severity.
 

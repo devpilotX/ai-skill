@@ -92,13 +92,30 @@ Money in floating point.
 
 ## Security
 
-Authorisation checked for the session but not for the object being accessed. The dominant real world
-defect: change one identifier in the request and read someone else's record.
+Authorisation checked for the session but not for the object being accessed: change one identifier in
+the request and read someone else's record. Broken access control is category A01 in the
+[OWASP Top 10 2021](https://owasp.org/Top10/A01_2021-Broken_Access_Control/).
+
+Mass assignment and field-level authorisation. A request body bound straight onto a model lets a caller
+set fields they should not own, such as `role`, `is_admin`, `owner_id`, `price`, or `tenant_id`. Check
+for an explicit allow list of writable fields per role, and check that responses do not return fields
+the caller may not read. OWASP API Security Top 10 2023 lists this as API3, broken object property level
+authorisation.
+
+CSRF on any state-changing endpoint authenticated by a cookie. Check for a token, or SameSite cookies
+plus an origin check, and that GET never changes state. Method in the
+[OWASP CSRF prevention cheat sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
+
+JWT algorithm misuse. The verifier must pin the expected algorithm and never take it from the token
+header, must reject `alg: none`, must not accept an HMAC token verified with an RSA public key as the
+secret, and must check expiry, issuer, and audience. See
+[RFC 8725, JSON Web Token best current practices](https://www.rfc-editor.org/rfc/rfc8725).
 
 Input rendered into HTML, SQL, a shell command, a template, or a file path without the right escaping
 for that context.
 
-Secrets in code, in logs, in error messages, or in anything sent to the client.
+Secrets in code, in error messages, or in anything sent to the client. Logs and telemetry have their own
+section below.
 
 A redirect or a fetch target taken from user input.
 
@@ -109,6 +126,19 @@ Timing sensitive comparison on a secret, meaning a plain equality check on a tok
 Missing rate limit on anything that authenticates, sends, or costs money.
 
 Permissions widened by the change without that being the stated intent.
+
+## Logs and telemetry
+
+Secrets, tokens, passwords, session identifiers, or full authorisation headers written to logs, traces,
+metrics labels, or error reporting.
+
+Personal data (email, name, address, government identifiers, payment data, health data) logged where a
+stable internal identifier would do. Logs usually have wider access and longer retention than the
+database.
+
+A whole request or response object logged, which starts leaking the day someone adds a sensitive field.
+
+An exception message that embeds user input, which then flows into every downstream log sink.
 
 ## Resources
 
@@ -137,6 +167,66 @@ A default changed, which silently alters behaviour for everyone who relied on it
 A version bump in a dependency that includes a breaking change.
 
 An error code or message that a consumer parses.
+
+## Deploy-time compatibility
+
+During a rolling deploy, old and new code run at the same time against the same database, queues, and
+caches. A change that is correct for either version alone can fail in the overlap.
+
+Old code against the new schema. A dropped or renamed column, a new NOT NULL column without a default,
+or a tightened constraint breaks the instances still running the previous release.
+
+New code reading old data. Messages already queued, cache entries already written, and jobs already
+scheduled carry the old shape. New code that cannot parse them fails or drops work, and a rollback then
+meets messages in the new shape.
+
+Expand and contract. The safe sequence is: add the new shape alongside the old, deploy code that writes
+both and reads either, backfill, switch reads, and only then remove the old shape in a later release.
+A single change that both adds and removes is the defect. `data-layer` covers online migrations.
+
+Serialised formats with no version field, so neither side can tell which shape it received.
+
+## Dependencies
+
+For each new or upgraded package, check:
+
+The name is exactly right and the package exists in the registry. Typosquatting targets near-miss
+names, and AI-generated code sometimes imports packages that do not exist, which an attacker can then
+register.
+
+The licence is compatible with how the product is distributed.
+
+Maintenance: last release, open security advisories, and number of maintainers. Retrieve these from
+the registry and the advisory database rather than stating them from memory.
+
+The lockfile diff. A one-line manifest change can pull in dozens of transitive packages. A manifest
+change with no lockfile change means the build is not reproducible.
+
+Whether the standard library or an existing dependency already does the job.
+
+## Feature flags
+
+The default when the flag service is unreachable. It should be the safe, old behaviour.
+
+The default in each environment, and whether the new path ships switched on by accident.
+
+Both branches tested, since the old path stays live until the flag is removed.
+
+A plan and an owner for removing the flag, because stale flags multiply the states to test.
+
+## AI-generated code
+
+Calls to functions, methods, options, or endpoints that do not exist in the version of the library in
+the lockfile. Check each unfamiliar call against the real documentation or source.
+
+Tests that assert the mock: the mock is configured to return X and the test asserts the result is X,
+with no production logic in between. Revert the production change mentally; if the test would still
+pass, it tests nothing.
+
+Plausible but wrong edge handling, such as an off-by-one in pagination or a swallowed exception with a
+comment claiming it is handled.
+
+Duplicated helpers that already exist elsewhere in the codebase with slightly different behaviour.
 
 ## Test adequacy for this change
 

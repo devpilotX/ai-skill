@@ -9,7 +9,7 @@ an advice page maintained by WikiProject AI Cleanup and licensed CC BY-SA 4.0, t
 research it cites. Observations were paraphrased and reorganised rather than copied. Follow the link
 for the original, which has example diffs from real articles.
 
-Read the limits in `../SKILL.md` first. None of these patterns proves machine authorship on its own.
+Read "What this cannot do" in `../SKILL.md` first. None of these patterns proves machine authorship on its own.
 They cluster, and the cluster is the signal.
 
 ## Why the patterns exist
@@ -30,7 +30,7 @@ role, underscores its importance, setting the stage for, indelible mark, deeply 
 Notability assertion. Text that argues the subject deserves attention by listing the kinds of outlets
 that covered it, rather than saying what those outlets reported. Phrases such as independent
 coverage, regional media outlets, trade publications, featured in, maintains an active social media
-presence. More common in output from 2025 onward.
+presence.
 
 Superficial analysis bolted onto a fact. Usually a present participle clause at the end of a
 sentence, adding an interpretation nobody sourced. Ending with ", highlighting the growing demand for
@@ -58,13 +58,13 @@ specific set of words. See the excess vocabulary analysis of biomedical abstract
 alignment training drove the overuse
 ([Juzek and Ward, arXiv 2412.11385](https://arxiv.org/abs/2412.11385)).
 
-The set moves over time, which matters if you are dating text rather than just cleaning it. Delve
+The set moves over time, which matters if you are dating text rather than just cleaning it. The
+periods below follow the Wikipedia advice page linked above. Delve
 peaked in 2023 and early 2024 and then fell away. The 2023 cluster included boasts, bolstered,
 crucial, delve, intricate, interplay, meticulous, pivotal, tapestry, testament, vibrant, and
 Additionally as a sentence opener. The mid 2024 cluster leaned on align with, enhance, foster,
 highlighting, showcasing, underscore. Later output favours emphasising, enhance, highlighting,
-showcasing, plus the notability assertions above. Grok output over-favours superficially scientific
-words such as empirical and causal.
+showcasing, plus the notability assertions above.
 
 One or two of these words means nothing. Density is the signal, which is why the detector reports a
 per thousand word rate as well as individual hits.
@@ -81,15 +81,16 @@ of saying they held it. "Was connected with science education at the university"
 "taught physics there from 2011".
 
 Negative parallelism. Not only X but also Y. It is not X, it is Y. Y rather than X. The construction
-implies the reader was about to reach a wrong conclusion. Humans use it, models use it as a reflex,
-and the reversed form is especially common in Grok output.
+implies the reader was about to reach a wrong conclusion. Humans use it, and models use it as a reflex.
 
 Three item rhythm. Adjective, adjective, adjective, or three parallel clauses used for cadence rather
 than because three things exist. Strongest signal when it appears somewhere nobody would bother with
 style, such as a commit message or an edit summary.
 
-Synonym rotation. Older models carried a repetition penalty, which produces elegant variation:
-the same idea renamed every time it recurs. Human writers repeat the right word.
+Synonym rotation, also called elegant variation: the same idea renamed every time it recurs. One
+proposed cause is a repetition penalty, which is a decoding setting chosen by whoever runs the model
+rather than a property of the model, and no source cited here establishes the link. Human writers
+repeat the right word.
 
 ## Formatting
 
@@ -106,10 +107,9 @@ signature.
 Heavy bold, especially an inline bolded label at the start of every list item, followed by a colon.
 The habit comes from readmes, slide decks, and listicles.
 
-Em dashes used where a comma, colon, or parenthesis would be normal, usually with spaces around them
-against most typographic conventions. Newer models were tuned to suppress this, and a 2026 comparison
-found only one major assistant using them more than professional writers, so treat this as
-corroboration rather than proof.
+Em dashes used where a comma, colon, or parenthesis would be normal, often with spaces around them.
+How often a model uses them varies by model and version, and many professional writers use them, so
+treat this as corroboration rather than proof.
 
 Curly quotes and curly apostrophes, sometimes mixed inconsistently with straight ones in the same
 document. Word processors and macOS also produce these, so it is weak on its own.
@@ -222,4 +222,7 @@ Occasional hedging and intensifiers such as very, perhaps, and tends to, which m
 Slightly wordy constructions that a copy editor would tighten, such as in order to, as a result of,
 and the fact that.
 
-Anything text predating 30 November 2022, which rules out these tools entirely.
+A verifiable publication date from before language model writing tools were publicly available.
+ChatGPT launched on 30 November 2022, but GPT-3 was available to developers from 2020 and writing tools
+were built on it, so a date shortly before ChatGPT does not rule machine text out. Only an earlier date
+does.

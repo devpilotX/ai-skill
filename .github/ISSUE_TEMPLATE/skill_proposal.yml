@@ -1,0 +1,32 @@
+name: Propose a skill or agent
+description: A new skill or agent, or a large change to an existing one.
+labels: ["proposal"]
+body:
+  - type: textarea
+    id: failure
+    attributes:
+      label: The failure it corrects
+      description: What an assistant gets wrong today without it. A topic is not enough.
+    validations:
+      required: true
+  - type: textarea
+    id: triggers
+    attributes:
+      label: What a user would type
+      description: Real phrasings that should activate it, and requests it must stay off for.
+    validations:
+      required: true
+  - type: textarea
+    id: overlap
+    attributes:
+      label: Overlap with existing skills
+      description: Which existing skills cover part of this, and where the boundary sits.
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources
+      description: Standards, documentation or papers the non-negotiables would rest on.
+    validations:
+      required: false
