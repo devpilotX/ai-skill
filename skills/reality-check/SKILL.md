@@ -1,9 +1,9 @@
 ---
 name: reality-check
-description: Blunt, anti-generic evaluation of an idea, plan, or decision. Use when the user asks whether something is a good idea, wants to start a business, product or side project, asks for validation, market analysis or startup ideas, or asks for honest, brutal, unfiltered, no-sugarcoating feedback, ground reality, a devil's advocate, or pushback. Also use when the user complains that AI answers are generic, obvious, the same for everyone, cheerleading, or sycophantic. Suppresses the consensus answer every other model user receives, anchors advice in the user's own non-transferable advantages, tests unit economics, capital, regulation, distribution and failure base rates against real sourced data, and ends in an explicit verdict with kill criteria. Triggers on brutal honesty, be honest with me, don't sugarcoat, reality check, pressure-test this, stress-test this, roast my idea, validate my idea, should I build this, will this make money, tell me the truth, am I wasting my time.
+description: Blunt, anti-generic evaluation of an idea, plan, or decision. Use when the user asks whether something is a good idea, wants to start a business, product or side project, asks to validate a business idea, wants startup ideas, or asks for honest, brutal, no-sugarcoating feedback, ground reality, a devil's advocate, or pushback. Also use when the user complains that AI answers are generic, the same for everyone, cheerleading, or sycophantic. Bans the consensus answer, anchors advice in the user's non-transferable advantages, tests economics, capital, regulation, distribution and base rates against sourced data, and ends in a verdict with dated kill criteria. Triggers on brutal honesty, be honest with me, don't sugarcoat, reality check, pressure-test this, stress-test this, roast my idea, validate my idea, should I build this, tell me the truth, am I wasting my time. Not for input or data validation in code. For pricing and unit economics use business-model. For sourced market research use deep-research.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
@@ -14,9 +14,10 @@ Two failures get corrected here, in order. Most honest-feedback instructions fix
 Sycophancy is praising a plan because the user owns it.
 
 Convergence is handing every user the same high-probability answer. Model responses cluster far more
-tightly with each other than independent human responses do
-([arXiv 2501.19361](https://arxiv.org/html/2501.19361v1)), and measured output diversity has fallen
-across model generations ([arXiv 2608.19437](https://arxiv.org/html/2608.19437)).
+tightly with each other than independent human responses do ("We're Different, We're the Same: Creative
+Homogeneity Across LLMs", [arXiv 2501.19361](https://arxiv.org/html/2501.19361v1)), and models are
+converging across generations ("Are LLMs becoming similarly creative? Evidence from three years of
+models", [arXiv 2608.19437](https://arxiv.org/html/2608.19437)).
 
 Fix tone without fixing convergence and you get a confident, rude, useless answer. A blunt generic
 answer is still a generic answer.
@@ -31,7 +32,13 @@ Stay off when:
 - The request is a factual lookup, a syntax question, or a defined implementation task. Just answer it.
 - The user already said this is a hobby, a learning exercise, or a loss leader. Their frame wins. Do not re-litigate motive.
 - The user already did the work the protocol would demand. They have revenue, or named buyers, or a chosen niche. Skip to the phase that adds something they do not have.
+- The user asks to validate input, a form, a schema or data in code. That is an implementation task, not a judgement call.
 - The user says "stop the reality check", "I've decided", or "just execute". Comply at once and stay off for the rest of the session unless re-invoked.
+
+Routing. Pricing, unit economics, cash cycle and runway for a plan that has already passed go to
+`business-model`. Recomputing a figure or checking someone's spreadsheet goes to `numbers-check`. A
+request for sourced market research with no decision attached goes to `deep-research`. Whether to change
+jobs or careers goes to `career-strategy`.
 
 A skill with no off switch becomes nagging, and nagging gets uninstalled.
 
@@ -66,8 +73,10 @@ Three to six bullets: the obvious framing, the obvious tooling, the obvious mark
 obvious first step.
 
 Naming it is what makes avoiding it possible. This is a text level version of estimating the
-consensus distribution and then moving away from it
-([arXiv 2606.09587](https://arxiv.org/html/2606.09587v1)). Method in
+consensus distribution and then moving away from it ("A Consensus-Aware Interaction Technique for
+Mitigating AI Homogenization", [arXiv 2606.09587](https://arxiv.org/html/2606.09587v1)). The estimate
+comes from the same model that would give the consensus answer, so it is a heuristic, not a measurement.
+Method in
 `references/consensus-firewall.md`.
 
 ### Phase 2, ban it
@@ -88,8 +97,8 @@ wording. At least one contradicts the premise. At least one is unwelcome.
 
 Tag each `COMMON`, `SEMI`, or `RARE` by how likely a typical assistant is to produce it, then carry
 forward the rare and semi-rare ones. Asking for an explicit spread of candidates instead of one best
-answer is a documented way out of mode collapse
-([arXiv 2510.01171](https://arxiv.org/html/2510.01171v3)).
+answer is a documented way out of mode collapse ("Verbalized Sampling: How to Mitigate Mode Collapse
+and Unlock LLM Diversity", [arXiv 2510.01171](https://arxiv.org/html/2510.01171v3)).
 
 Rarity is a filter applied before the truth test, never after. A rare idea that is wrong dies in
 phase 5.
@@ -113,7 +122,16 @@ and go back to phase 3. Advice that survives anyone's substitution is tied to no
 Now try to break what is left, with real numbers. Unit economics, capital and time to first revenue,
 the working capital cycle, distribution, incumbents and the do-nothing option, regulation and
 licensing, and the base rate for the category. Retrieve real figures. Label the rest as assumptions.
-Full checklist and the traps specific to each domain in `references/ground-reality.md`.
+Full checklist and the traps specific to each domain in `references/ground-reality.md`. Where to find
+survival data and how to read it are in `references/base-rates.md`.
+
+Compute, do not estimate in prose. Follow `numbers-check` for any arithmetic, and use the calculator that
+ships with `business-model` for contribution, cash cycle, payback and peak funding. This phase stays
+coarse: enough to find the number that kills the plan, not a full model.
+
+With no search tool, every figure is `ASSUMPTION:`, the response says so once near the top, and the
+verdict leans toward `NOT ENOUGH INFORMATION` unless the conclusion holds across the whole plausible
+range of the load-bearing number.
 
 The question that does the most work: what has to be true for this to work, and is it true?
 
@@ -122,23 +140,17 @@ The question that does the most work: what has to be true for this to work, and 
 Commit. `BUILD`, `PIVOT`, `KILL`, or `NOT ENOUGH INFORMATION`, and the last one only when a named
 obtainable fact decides it.
 
-Then give the one assumption everything rests on, kill criteria with numbers and dates, and one
-falsifiable test that runs in seven days under a stated cost. Format in
-`references/verdict-protocol.md`.
+Then give the one assumption everything rests on, kill criteria with numbers and absolute calendar
+dates, and one falsifiable test that runs in seven days under a stated cost. Every verdict, including
+KILL, carries the seven-day test. Format in `references/verdict-protocol.md`.
+
+After BUILD or PIVOT, add one line handing the chosen target to `business-model` for pricing and the cash
+model. After any verdict that rested on arithmetic the user will reuse, point to `numbers-check`. No other
+closing text.
 
 ### Phase 7, self-audit before delivering
 
-Check every line silently. Fix anything that fails before sending.
-
-- Nothing from the phase 2 blacklist appears as an unearned recommendation.
-- The swap test passes. This advice would be wrong for a different person.
-- Every number is cited or labelled `ASSUMPTION:`.
-- Every objection names a concrete failure rather than a feeling. No filler.
-- No banned phrasing from `references/tone-contract.md`, no reflexive agreement, no praise wrapped around the objection, no encouraging close.
-- A verdict is present and unambiguous.
-- Kill criteria carry numbers and dates.
-- The attack landed on the idea, not the person.
-- If the idea is good, that is stated plainly rather than hedged into mush.
+Run the checks in the self-audit section below, silently. Fix anything that fails before sending.
 
 ## Tone
 
@@ -153,3 +165,39 @@ blunt and abusive are in `references/tone-contract.md`.
 `references/example-timber.md` runs the whole protocol on "I'm going to start a timber company",
 including the consensus answer it refuses to give and how two users with the same sentence get
 opposite verdicts.
+
+## Self-audit
+
+- Nothing from the phase 2 blacklist appears as an unearned recommendation.
+- The swap test passes. This advice would be wrong for a different person.
+- Every number is cited with a working link or labelled `ASSUMPTION:`.
+- With no search tool, the response says so and the verdict reflects it.
+- Every arithmetic result came from a script, not from prose.
+- Every objection names a concrete failure rather than a feeling. No filler.
+- No banned phrasing from `references/tone-contract.md`, no reflexive agreement, no praise wrapped around the objection, no encouraging close.
+- A verdict is present and unambiguous.
+- Kill criteria carry numbers and absolute calendar dates, not durations.
+- The seven-day test is present, including after a KILL.
+- After BUILD or PIVOT, the `business-model` hand-off line is present.
+- A regulated category names the professional and the question to ask them.
+- The attack landed on the idea, not the person.
+- If the idea is good, that is stated plainly rather than hedged into mush.
+
+## What this cannot do
+
+The consensus estimate in phase 1 is produced by the same model whose consensus it is trying to avoid.
+It is a heuristic for stepping off the obvious answer, not a measurement of what other users received,
+and it can miss the centre entirely.
+
+Without a search tool it cannot ground anything. Every figure becomes `ASSUMPTION:`, and the verdict
+moves toward `NOT ENOUGH INFORMATION` because the evidence that would decide it was never retrieved.
+
+It cannot predict demand. The seven-day test produces evidence; the verdict before it is a judgement on
+the information available.
+
+It does not give legal, tax, or regulatory advice. In a regulated category (health, finance, food,
+childcare, legal services, transport, alcohol, energy), the verdict is conditional on a professional's
+answer. Ask a solicitor or attorney who practises in that sector: "What licences, registrations, and
+insurance does a business selling X to Y in Z need before its first sale, how long does each take, and
+what personal liability do I carry?" Ask a chartered accountant or CPA: "Which entity and tax
+registrations does this need at an expected first-year revenue of N, and what do they cost each year?"

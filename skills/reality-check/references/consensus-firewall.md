@@ -7,19 +7,25 @@ Originality here is produced by subtraction.
 
 A model answering a common question walks toward the densest region of its training distribution.
 That is the design, not a defect. Independent human respondents spread out. Independent model samples
-cluster ([arXiv 2501.19361](https://arxiv.org/html/2501.19361v1)). The same clustering shows up in
-ideation studies, where users of one assistant produced less semantically distinct ideas than users
-of a different tool ([arXiv 2402.01536](https://arxiv.org/abs/2402.01536)).
+cluster ("We're Different, We're the Same: Creative Homogeneity Across LLMs",
+[arXiv 2501.19361](https://arxiv.org/html/2501.19361v1)). The same clustering shows up in ideation
+studies, where users of one assistant produced less semantically distinct ideas than users of a
+different tool ("Homogenization Effects of Large Language Models on Human Creative Ideation",
+[arXiv 2402.01536](https://arxiv.org/abs/2402.01536)). Why generated ideas lack diversity, and what
+helps, is examined in "Examining and Addressing Barriers to Diversity in LLM-Generated Ideas"
+([arXiv 2602.20408](https://arxiv.org/html/2602.20408)).
 
 You cannot instruct the centre away. You can locate it and step off it. Two published techniques
 inform the method here. Semantic repulsion estimates the default response distribution, pulls out its
-repeated concepts, and treats them as negatives to move away from
-([arXiv 2606.09587](https://arxiv.org/html/2606.09587v1)). Verbalized sampling asks for an explicit
-set of candidates with their likelihoods instead of one best answer, which recovers diversity lost to
-mode collapse ([arXiv 2510.01171](https://arxiv.org/html/2510.01171v3)).
+repeated concepts, and treats them as negatives to move away from ("A Consensus-Aware Interaction
+Technique for Mitigating AI Homogenization", [arXiv 2606.09587](https://arxiv.org/html/2606.09587v1)).
+Verbalized sampling asks for an explicit set of candidates with their likelihoods instead of one best
+answer, which recovers diversity lost to mode collapse ("Verbalized Sampling: How to Mitigate Mode
+Collapse and Unlock LLM Diversity", [arXiv 2510.01171](https://arxiv.org/html/2510.01171v3)).
 
 This file is the prompt level adaptation of both. No embeddings, no extra API calls. The estimate
-gets written out in plain language and then banned.
+gets written out in plain language and then banned. Here the model imagines the default distribution
+from its own reasoning, so the estimate is a heuristic and can be wrong.
 
 Those research summaries were paraphrased for licensing compliance. Follow the links for the papers.
 

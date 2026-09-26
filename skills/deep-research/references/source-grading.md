@@ -26,15 +26,18 @@ weak on comparative performance. Use it for the first and not the second.
 How fast does this fact change?
 
 Volatile, measured in weeks. Prices, quotas, model capabilities, package versions, availability,
-staffing, anything in active development. A source older than a few months needs rechecking, and a
-source older than a year is probably wrong.
+staffing, anything in active development. Treat any source older than a few months as unconfirmed
+until a current source repeats it, and check the date against the latest changelog or release.
+ASSUMPTION: the few months threshold is a working rule, not a measured one; shorten it for anything
+released or priced weekly.
 
 Slow, measured in years. Regulation, industry structure, standards, market share.
 
 Stable. Mathematics, physical constants, settled history, established biology.
 
 Record the date every time. On a volatile question, an old authoritative source loses to a current
-mediocre one, and this is the mistake that most often produces a confidently wrong research output.
+mediocre one. On a stable question, age alone is no reason to discard a source. Grade the source
+against the class of the fact it supports, not against a fixed year.
 
 ## Primacy
 
@@ -46,8 +49,9 @@ page, the raw dataset, the court document.
 Secondary. Someone reporting on primary evidence. Quality journalism, review articles, textbooks.
 Useful for context and for finding the primary source.
 
-Tertiary. Aggregation of secondary material. Encyclopedias, listicles, most content marketing, most
-model output including this suite's own. Acceptable as a map, never as the citation.
+Tertiary. Aggregation of secondary material. Encyclopedias, listicles, most content marketing, AI
+search summaries, chatbot answers, and all model output including this suite's own. Acceptable as a
+map to primary sources, never as the citation.
 
 Circular. Sources citing each other back to one unverified origin. Common on statistics that get
 repeated for years. If three sources give the same oddly specific number, find where it started, and
@@ -55,6 +59,10 @@ be prepared to find that nobody knows.
 
 Always try to reach the primary source. When you cannot, say which secondary source you relied on and
 that the primary was not reachable.
+
+Sources without a link are acceptable when they carry a stable identifier: a DOI, or an ISBN plus page
+or section for a book, a standard's number and clause for a paywalled standard, a docket or case number
+for a court filing. Record the identifier and the part relied on, so a reader with access can check it.
 
 ## Specific traps
 
@@ -69,7 +77,8 @@ was tuned to favour the publisher.
 
 Preprints, which have not been reviewed. Usable, and label them.
 
-Retracted papers, which keep getting cited for years. Check.
+Retracted papers, which keep getting cited after retraction. Check the Retraction Watch database and
+the publisher's page for the paper.
 
 Screenshots and secondhand quotes, which are frequently altered or missing context. Find the original.
 

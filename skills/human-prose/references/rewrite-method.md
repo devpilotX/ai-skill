@@ -5,7 +5,9 @@ How to work on text you did not write.
 
 ## Diagnose before editing
 
-Run the detector first and read the report, then read the text yourself. The two findings lists
+Run the detector first (`python3 skills/human-prose/scripts/ai_tells.py <file>` from the repository
+root) and read the report, then read the text yourself. What each rule matches and its false positives
+are in `references/detector-rules.md`. The two findings lists
 rarely match, and the gap is informative.
 
 Decide which of three problems you have, because they need different work.
@@ -53,7 +55,10 @@ Work through these in sequence. Later steps depend on earlier ones.
 This is what separates a rewrite from a paraphrase, and it is the step that cannot be automated.
 
 For each vague sentence, ask what fact would make this checkable. Then either get the fact from the
-user or mark it for them to fill.
+user or mark it for them to fill, using the marker convention from step 2 of `../SKILL.md`: a short
+square-bracketed note starting with the word insert. The detector reports that shape as a high severity
+placeholder, which is the point. A marked draft fails the check until every gap is filled or cut, so it
+cannot ship as finished by accident. Hand it back labelled as a draft.
 
 "Significant cost savings" becomes "cut the monthly bill from 4,100 to 2,600".
 

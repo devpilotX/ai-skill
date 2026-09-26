@@ -20,6 +20,11 @@ confirmed list stays trustworthy.
 Severity follows consequence, never effort. A one character fix preventing a data leak is critical. A
 month of refactoring for elegance is low.
 
+The verdict follows from these severities by the rule in step 5 of `SKILL.md`: any open Critical is DO
+NOT SHIP; open Highs allow SHIP WITH FIXES only when each has a listed fix and a verification that passes
+before release; otherwise SHIP; and an unreviewed gate that could hold a Critical is NOT ENOUGH ACCESS.
+Observations never change the verdict.
+
 ## Structure
 
 ```
@@ -39,7 +44,8 @@ BLOCKERS
    Fix: [the specific change]
 
 HIGH
-[same shape]
+[same shape, plus]
+   Verify before release: [the test, reproduction or command that must pass]
 
 MEDIUM AND LOW
 [same shape, may be condensed to one line each]
@@ -48,7 +54,7 @@ GATES
 Correctness: pass, checked [what]
 Tests: finding, see 3
 Secrets: pass, scanned working tree and history
-[... all eleven, each pass / finding / not applicable / not reviewed]
+[... all twelve gates from references/gates.md, each pass / finding / not applicable / not reviewed]
 
 OBSERVATIONS
 [Unconfirmed items, clearly marked]

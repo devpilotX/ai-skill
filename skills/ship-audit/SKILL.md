@@ -1,115 +1,138 @@
 ---
 name: ship-audit
-description: Audit a codebase or product for production readiness and report what blocks release. Use when the user asks whether a project is ready to ship, launch, or go live, asks for a production readiness review, a pre-launch checklist, a security or performance or accessibility audit, asks what is missing or what they forgot, or wants a SaaS or app checked end to end. Also use before a first deploy, a public launch, or a customer demo. Walks eleven gates covering correctness, tests, security, secrets, data and migrations, failure handling, performance, cost, observability, accessibility, dependency and licence risk, operations and legal, then reports blockers by severity with file and line evidence and an explicit ship or do not ship verdict. Finds real defects rather than producing a generic checklist. Triggers on is this production ready, ready to launch, pre-launch audit, what am I missing, security review, harden this, review my whole project, ship it or not.
+description: Audit a whole codebase or product for production readiness. Use when the user asks whether a project is ready to ship, launch or go live, asks for a production readiness review or pre-launch checklist, asks what is missing or what they forgot, or wants a SaaS or app checked end to end before a first deploy, launch or demo. Walks twelve gates: correctness, tests, secrets and configuration, authentication and authorisation, input handling and web security, data and backups, failure and recovery, performance and cost, observability, accessibility, dependencies and licences, operations and legal. Reports findings by severity with file and line evidence and a ship or do not ship verdict set by a fixed severity rule. Covers a whole release only; a single concern audit (security, performance, accessibility) goes to the specialist skill. Triggers on is this production ready, ready to launch, pre-launch audit, go live checklist, what am I missing, review my whole project, ship it or not.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Ship audit
 
-A release decision with evidence attached. The output is a list of specific defects in specific
-files, not a checklist someone could have printed before reading the code.
+The failure this corrects: a release decision made from a generic checklist, or from an audit padded
+with invented findings. "Add tests, handle errors, check security" is identical for every project and
+helps nobody, and filler findings (style nits, hypothetical edge cases, advice to extract a helper)
+bury the one defect that loses data. The output here is a verdict backed by specific defects in specific
+files, and a short report when the project is in good shape.
 
-## Two failure modes this avoids
+## When to use and when to stay off
 
-A generic checklist. Anyone can produce "add tests, handle errors, check security". That output is
-identical for every project and helps nobody. Every finding here names a file, a line, and what
-happens when it breaks.
+Run when the user wants a ship or do not ship decision on a whole release, product or codebase.
 
-Invented findings. Once an audit persona is running, there is pressure to produce volume, so filler
-appears: style nits, hypothetical edge cases, advice to extract a helper. If the project is in good
-shape, the correct report is short. Say so and stop.
+Stay off, or hand over, when the request covers one concern. This skill covers a whole release; a single
+concern audit goes to the specialist:
+
+- Security only: `security-hardening`.
+- Schema, migrations or backups only: `data-layer`.
+- Logging, metrics or alerting only: `observability-setup`.
+- Accessibility or front end quality only: `frontend-build`.
+- Test coverage or test design only: `test-strategy`.
+- Hosting, infrastructure or deploy pipeline only: `infra-deploy`.
+- Release process, staging or rollback only: `release-manage`.
+- Speed or cost only: `performance-tuning`.
+- One diff or pull request: `code-review`.
+
+Off switch: the user says "stop", "I've decided", or "just execute". Comply at once and stay off for
+the rest of the session unless asked again.
 
 ## Non-negotiables
 
-1. Read the code before judging it. No finding may be reported for a file that was not opened. If coverage was partial, say which parts were not reviewed.
-2. Every finding carries a path, a line or symbol, the failure it causes, and a fix. A finding without a reproduction path is a guess, and it gets labelled as one.
-3. Never invent a benchmark, a vulnerability identifier, or a compliance requirement. Retrieve advisories and requirements, or mark the item as needing verification.
-4. Severity reflects consequence, not effort. A one line fix that prevents data loss is critical. A large refactor that improves elegance is not a blocker.
-5. No filler. If a gate is genuinely fine, record it as passed in one line.
-6. Do not soften the verdict because the user is close to launch. That is exactly when the verdict matters.
+These override everything else in this file.
+
+1. Read the code before judging it. No finding for a file that was not opened. Partial coverage is stated.
+2. Every finding carries a path, a line or symbol, the trigger, the consequence and a fix. Without a trigger it is an observation.
+3. Never invent a benchmark, a vulnerability identifier or a compliance requirement. Retrieve it or mark it as needing verification.
+4. Severity follows consequence, not effort.
+5. The verdict follows the severity rule in step 5, with no exceptions for launch pressure.
+6. No filler. A gate that passes gets one line.
 
 ## Procedure
 
 ### Step 1, establish what shipping means here
 
-Ask, or infer from the repository, then state the assumption. An internal tool with five users, a
-public signup product handling payments, and a library published to a package registry have different
-bars, and applying the wrong one wastes the audit.
+Ask, or infer from the repository, and state the assumption. An internal tool with five users, a public
+signup product taking payments, and a library published to a registry have different bars.
 
 Four facts change almost every conclusion: does it handle personal data, does it handle money, can a
 failure lose data, and how many users does an outage affect. Get those first.
 
 ### Step 2, map before reading
 
-Find the entry points, the routes or commands, the data stores, the external calls, the auth
-boundary, the build and deploy path, and the test suite. Note what exists and what is absent, because
-absence is the most common finding and the easiest to miss.
+Find the entry points, data stores, external calls, auth boundary, build and deploy path, and test suite.
+Note what is absent as well as what exists.
 
-Run the tooling the project already has. Existing linters, type checkers, test suites, and audit
-commands produce evidence faster than reading does, and their output is verifiable.
+Run the tooling the project already has and report what it said. A command that fails to run is itself a
+finding.
 
 ```
 # examples, adapt to the stack actually present
 npm audit --omit=dev ; npx tsc --noEmit ; npm test
-pip-audit ; mypy . ; pytest -q
+pip-audit -r requirements.txt ; mypy . ; pytest -q
 cargo audit ; cargo clippy -- -D warnings
 go vet ./... ; govulncheck ./...
+gitleaks git -v .
 ```
 
-Report what you ran and what it said. If a command fails to run at all, that is itself a finding.
+### Step 3, walk the twelve gates
 
-### Step 3, walk the gates
+Details and the questions that catch real defects are in `references/gates.md`. Work them in order,
+because later gates assume earlier ones. The specialist skill named for each gate holds the deeper
+method if a gate needs more than the audit covers.
 
-Eleven gates in `references/gates.md`, each with the specific things to look for and the questions
-that catch real defects. Work them in order, because later gates assume earlier ones.
+1. Correctness, `code-review`
+2. Tests, `test-strategy`
+3. Secrets and configuration, `security-hardening`
+4. Authentication and authorisation, `security-hardening`
+5. Input handling and web security, `security-hardening`
+6. Data, migrations and backups, `data-layer`
+7. Failure and recovery, `infra-deploy`
+8. Performance and cost, `performance-tuning`
+9. Observability, `observability-setup`
+10. Accessibility and client quality, `frontend-build`
+11. Dependencies and licences, `security-hardening`
+12. Operations and legal, `release-manage`
 
-Correctness and error handling. Tests. Secrets and configuration. Authentication and authorisation.
-Input handling and injection. Data, migrations, and backups. Failure and recovery. Performance and
-cost. Observability. Accessibility and client quality. Dependencies, licences, and operations.
-
-For each gate record one of four states: pass, with what was checked; finding, with evidence;
-not applicable, with the reason; or not reviewed, with what would be needed.
+For each gate record one state: pass, with what was checked; finding, with evidence; not applicable,
+with the reason; or not reviewed, with what would be needed.
 
 ### Step 4, verify each finding
 
-Before a finding goes in the report, answer two questions. What is the exact sequence that triggers
-this, and what does the user or the business lose when it does?
+Answer two questions: what exact sequence triggers it, and what does the user or business lose when it
+does? If either answer is vague, dig until it is concrete or downgrade it to an observation. Observations
+go in their own section and never affect the verdict.
 
-If either answer is vague, either dig until it is concrete or downgrade the finding to an observation.
-Observations go in a separate section, clearly marked as unconfirmed.
+### Step 5, apply the severity rule and report
 
-### Step 5, report
+Severity definitions are in `references/report-format.md`. The verdict is mechanical:
 
-Format in `references/report-format.md`. Verdict first, then blockers, then everything else. The
-verdict is one of:
+- DO NOT SHIP if any Critical finding is open. A Critical fixed during the audit counts as closed only after the fix is re-verified with the original trigger.
+- DO NOT SHIP if any High finding lacks a listed fix and a named verification step.
+- SHIP WITH FIXES if there is no open Critical and one or more High findings, each listed with its fix and the verification (test, reproduction or command) that must pass before release. Nothing else goes on that list.
+- SHIP if there is no open Critical or High. Medium and Low findings are tracked with an owner and do not block.
+- NOT ENOUGH ACCESS if a gate that could hold a Critical for this product (for example secrets, authorisation, or backups for a product that stores user data) was not reviewed. This overrides SHIP and SHIP WITH FIXES, never DO NOT SHIP. Name exactly what access is needed.
 
-SHIP. No critical or high findings. Remaining items are tracked, not blocking.
+Format in `references/report-format.md`. Verdict first, then blockers, then everything else.
 
-SHIP WITH FIXES. A named short list must land first. State the list and nothing more.
+## Self-audit
 
-DO NOT SHIP. At least one critical finding, stated in the first three lines, with the consequence
-spelled out.
-
-NOT ENOUGH ACCESS. The audit could not reach something that decides the verdict, such as production
-configuration or the deploy pipeline. Name exactly what is needed.
-
-### Step 6, self-audit the audit
-
-- Every finding names a file and a line or symbol.
-- Every finding has a stated consequence, not just a rule violation.
+- Every finding names a file and a line or symbol, a trigger and a consequence.
 - No finding cites code that was not read.
-- Severity ordering would survive a disagreement with the author.
-- Passed gates are recorded, so the reader can see coverage rather than guessing.
-- Anything unreviewed is disclosed rather than quietly omitted.
-- Commands that were run are listed with their real output, not paraphrased.
+- All twelve gates appear in the report with a state.
+- The verdict matches the step 5 rule when checked against the finding list.
+- Every High on a SHIP WITH FIXES list has a fix and a verification step.
+- Observations are separate and did not change the verdict.
+- Commands run are listed with their real output.
+- Every legal item ends with "ask a lawyer:" (or the named professional) and an exact question.
 - The report would be shorter if the project were in better shape.
 
-## Scope honesty
+## What this cannot do
 
-A static review finds a subset of problems. It does not find race conditions under real load, most
-logic errors that match the author's intent, or anything depending on production data shape. Say what
-the audit could not cover instead of implying completeness, and recommend the test that would cover
-it.
+A static review finds a subset of problems. It does not find race conditions that appear only under
+real concurrency, logic errors that match the author's intent, or defects that depend on production data
+shape or production configuration it was not shown. State what the audit could not cover and recommend
+the test that would, such as a load test, a restore drill or a penetration test.
+
+It cannot give legal advice. Legal items in gate 12 end with the exact question for a lawyer. Card data
+scope needs a PCI Qualified Security Assessor; ask: "Given this payment flow (describe where card data is
+entered and whether it touches our servers), which PCI DSS self-assessment questionnaire applies, and
+which requirements are in scope?"

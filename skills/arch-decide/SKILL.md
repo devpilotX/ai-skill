@@ -1,129 +1,182 @@
 ---
 name: arch-decide
-description: Choose a technical architecture and record the decision with its reversibility and consequences. Use when the user asks how to structure a system, whether to use a monolith or microservices, which database or queue or framework to pick, how services should communicate, whether to go serverless, how to split a codebase, or asks for a technical design or an architecture decision record. Also use when a choice is hard to reverse later. Classifies the decision by how expensive reversal is, spends effort in proportion to that, gives three genuinely different options with what each makes hard later, states the argument against the recommendation, and writes an immutable decision record. Refuses to recommend complexity the team size cannot operate. Triggers on monolith or microservices, which database should I use, how should I structure, system design, architecture decision, ADR, serverless or containers, sync or async, should I split this service, tech stack choice.
+description: Choose a technical architecture and record the decision with its reversibility and consequences. Use when the user asks how to structure a system, monolith, microservices or modular monolith, event driven or request response, which message queue or Kafka, CQRS, multi-tenant design, how services communicate, serverless or containers, build vs buy, managed or self-hosted, vendor lock-in, or asks for a design doc, RFC or ADR. Classifies by reversal cost, scales options to it including doing nothing, argues against its own recommendation, and writes an immutable record with a revisit trigger. Refuses complexity the team cannot operate. Schema, index and database engine details go to data-layer, hosting and deploy mechanics to infra-deploy, moving an existing system to migration-plan. Triggers on monolith or microservices, modular monolith, event driven, message queue, Kafka, CQRS, multi-tenant, system design, design doc, RFC, ADR, build vs buy, vendor lock-in, sync or async, tech stack choice.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   suite: ai-skill
 ---
 
 # Architecture decisions
 
-Effort spent on a decision should match the cost of reversing it. Most architecture argument is spent on
-cheap decisions while the expensive ones get made by default.
+Most architecture argument gets spent on decisions that are cheap to reverse, while the expensive ones
+get made by default, with no options compared and no record of why. This skill corrects that by
+matching effort to the cost of reversal and writing down the decision with the condition that should
+reopen it.
 
-## Classify first
+## When to use and when to stay off
 
-Before discussing options, say which kind of decision this is. The classification determines how much
-process it deserves.
+Run when a structural choice is being made: deployment shape, service boundaries, communication style,
+tenancy, the primary datastore class, build against buy, or a vendor that will hold data. Run also when
+the user asks for a design doc, an RFC or a decision record.
 
-One way doors, where reversal costs months. The data model, the primary datastore, the public API shape,
-the tenancy model, the authentication model, the choice to split into separate deployable services, and
-anything that lands in a customer's integration. These justify research, options and a written record.
+Stay off, and route instead, when:
 
-Two way doors, where reversal costs days. Internal library choices, code layout, the CI provider, most
-framework choices inside an established stack, log format. Pick a reasonable option, note why, move on.
-Debating these is the most common form of procrastination in engineering.
+- The question is schema design, indexing, a query or engine specific tuning. Use `data-layer`.
+- The question is hosting, containers, pipelines or deploy mechanics. Use `infra-deploy`.
+- The system already exists and the question is how to move it. Use `migration-plan`.
+- The request is a whole build from a vague idea. Use `build-pilot`, which calls this skill at its decision stage.
+- The decision is already made and the user wants it implemented. Record it if asked, then stay off.
 
-Hidden one way doors, which look cheap and are not. A queue whose message format leaks into consumers, a
-third party for anything holding customer data, an identifier format that reaches other systems, and any
-vendor whose export path was never checked. Ask early how you would get out.
-
-State the classification in the first two lines of any architecture answer.
+The user says "stop", "I've decided", or "just execute": comply at once and stay off for the rest of
+the session unless asked again.
 
 ## Non-negotiables
 
-1. Match the design to the team that operates it. A four person team running twelve services spends its capacity on the platform instead of the product. Say the operational cost in people, not just in components.
-2. No option list that is one real option plus two strawmen. Each option must be one a competent engineer would defend.
-3. Give the argument against your recommendation. If you cannot, you do not understand the tradeoff yet.
-4. Verify the constraint, do not recall it. Limits, quotas, pricing, version compatibility and feature availability change. Retrieve them with a date, or mark them as unverified.
-5. Name what each option makes hard later, since that is what people regret rather than what it makes hard now.
-6. Prefer the boring option unless a named requirement rules it out. Novelty is a cost paid in debugging at the worst time.
-7. Never propose a distributed system to solve a problem that is a missing index.
+These override everything else in this file.
+
+1. Classify the decision (one way, two way, hidden one way) before discussing options, and state it in the first two lines of the answer.
+2. Match the design to the team that operates it. State operational cost in people and ongoing hours, not only in components.
+3. Every option listed is one a competent engineer would defend. No strawmen.
+4. Give the argument against the recommendation.
+5. Verify constraints, do not recall them. Limits, quotas, pricing, version compatibility and feature availability are retrieved with a date through `deep-research`, or marked unverified.
+6. No invented thresholds. A threshold is measured, retrieved from a cited source, or labelled `ASSUMPTION:` with its reasoning.
+7. Prefer the boring option unless a named requirement rules it out, and never propose a distributed system to solve a missing index.
 
 ## Procedure
 
-### Step 1, extract the forces
+### Step 1, classify
 
-A decision only has an answer once the constraints are known. Get these before designing.
+The classification decides how much process the decision deserves.
 
-Load, meaning current and expected requests, data volume and growth, and whether traffic is steady or
-spiky. An honest answer here usually shrinks the design.
+One way doors, where reversal costs months: the data model, the primary datastore, the public API
+shape, the tenancy model, the authentication model, splitting into separately deployable services, and
+anything that lands in a customer's integration. These get research, options and a written record.
 
-Consistency needs, meaning which operations must be correct immediately and which can settle later.
-This single question decides more architecture than any other.
+Two way doors, where reversal costs days: internal library choices, code layout, the CI provider, most
+framework choices inside an established stack, log format. Pick a reasonable option, note why, move on.
 
-Team, meaning how many engineers, what they already know, who is on call, and what happens at 3am.
+Hidden one way doors, which look cheap and are not: a message format that leaks into consumers, a third
+party holding customer data, an identifier format that reaches other systems, a vendor whose export
+path was never checked. Ask early how you would get out. The detection questions and per vendor exit
+checks are in `references/exit-paths.md`. A hidden one way door that fails its exit check gets treated
+as one way.
 
-Constraints that are already fixed: existing systems, contracts, regulatory requirements, data
-residency, budget, deadline.
+### Step 2, extract the forces
 
-Failure tolerance, meaning what breaks for whom when a part goes down, and how long is acceptable.
+Load: current and expected requests, data volume and growth, steady or spiky. An honest answer here
+usually shrinks the design.
 
-When load is unknown, say that the design assumes a range, state the range, and note the point at which
-the design needs revisiting. A number with a threshold beats a vague promise to scale.
+Consistency: which operations must be correct immediately and which can settle later.
 
-### Step 2, generate three real options
+Recovery objectives as numbers: RPO, the amount of recent data the business accepts losing, and RTO,
+the time it accepts being down. Get both from the person who owns the business consequence. "As little
+as possible" is not a number, and the pair decides backup, replication and failover design.
 
-Force variety. One option should be the simplest thing that could work, usually a single deployable
-application with one database. One should be the conventional answer for this class of problem. One
-should exploit something specific about this situation, which is where the good answers usually live.
+Team: how many engineers, what they already know, who is on call.
 
-Common tradeoff analyses for recurring decisions are in `references/tradeoffs.md`, covering deployment
-shape, service communication, datastore selection, caching, tenancy and state placement.
+Fixed constraints: existing systems, contracts, regulation, data residency, budget, deadline. If the
+system holds personal data, payments or credentials, bring in `security-hardening` for the threat model
+before options are compared.
 
-### Step 3, cost each option honestly
+When load is unknown, state the assumed range as an `ASSUMPTION:` and name the revisit trigger that
+would show the range was wrong.
 
-For each: build effort, operational burden in ongoing hours, running cost at expected load, what it makes
-hard later, the failure mode it introduces, and what the team has to learn.
+### Step 3, generate options scaled to the classification
 
-Operational burden is the number that gets omitted and then dominates. Count it.
+One way door: at least three real options plus doing nothing. One is the simplest thing that could
+work, usually a single deployable with one database. One is the conventional answer for this class of
+problem. One exploits something specific about this situation.
 
-### Step 4, recommend and argue against
+Two way door: one reasonable option and doing nothing, a line each. Three options here is waste.
 
-One recommendation. Then the strongest case against it, and the condition under which the other option
-wins. Name the threshold in numbers where possible, as in this design holds to roughly a thousand writes
-per second and then needs partitioning.
+Doing nothing always gets a row, with what it costs to keep the current state.
 
-### Step 5, record it
+Analyses for recurring decisions are in `references/tradeoffs.md`: deployment shape, service
+communication and the transactional outbox, datastore class, caching, tenancy, state placement,
+serverless, and build against buy.
 
-Write the decision record using the shape in `doc-forge`, at `docs/decisions/NNNN-title.md`. Context,
-decision, options considered, consequences, and reversal cost.
+### Step 4, cost each option
 
-Keep records immutable. When a decision changes, add a new record and mark the old one superseded with a
-link. An edited record loses the reasoning that made it worth keeping.
+For each: build effort, operational burden in ongoing hours per month, running cost at expected load,
+what it makes hard later, the failure mode it introduces, what the team has to learn, and how it meets
+the RPO and RTO.
+
+Operational burden is the number that gets omitted and then dominates. Count it. Running costs are
+retrieved from current vendor pricing pages with a date, and the arithmetic goes through
+`numbers-check`.
+
+### Step 5, recommend and argue against
+
+One recommendation. Then the strongest case against it, and the condition under which another option
+wins.
+
+State that condition as a measurable revisit trigger. Measure it where possible: load test the chosen
+design and record the write rate, data size or tenant count at which latency, replication lag or cost
+crosses the target. Where it has not been measured, write it as `ASSUMPTION:` with the reasoning and the
+measurement that would confirm it.
+
+### Step 6, record it
+
+Find where the repository already keeps decision records (for example `docs/adr`, `docs/decisions`,
+`adr`, or `doc/architecture/decisions`) and follow its numbering, template and status conventions.
+Propose `docs/decisions/` only when the repository has none.
+
+Where the repository has no template, use the "Decision record" section of the templates reference in
+`doc-forge`: status, date, deciders, context, decision, options considered including doing nothing,
+consequences, and reversal. The reversal section carries the reversal cost and the revisit trigger from
+step 5. `build-pilot` uses the same fields.
+
+Keep records immutable. When a decision changes, add a new record and mark the old one superseded with
+a link.
+
+If the decision replaces something already running, hand the transition to `migration-plan`.
 
 ## Anti-patterns worth naming directly
 
-Resume driven design, meaning the choice that is interesting to build rather than cheap to run.
+Resume driven design: the choice that is interesting to build instead of cheap to run.
 
-Scaling for load that does not exist, which buys complexity now against revenue that is hypothetical.
-The cost is paid in slower delivery, which makes the revenue less likely.
+Scaling for load that does not exist, paid for in slower delivery.
 
-Splitting services along team boundaries that will change, rather than along data ownership that will
-not.
+Splitting services along team boundaries that will change instead of along data ownership.
 
-Shared database between services, which produces the operational cost of distribution with the coupling
-of a monolith.
+A shared database between services, which brings the cost of distribution with the coupling of a
+monolith.
 
-Distributed transactions, which are almost always a sign the boundary is in the wrong place.
+Distributed transactions, usually a sign the boundary is in the wrong place.
 
-Event driven design adopted for its own sake, which converts a readable call stack into a debugging
-exercise across seven logs.
+Writing to the database and publishing an event as two separate steps, which loses or invents events on
+failure. See the outbox section in `references/tradeoffs.md`.
+
+Event driven design adopted for its own sake.
 
 A cache added to fix a query that has no index.
-
-Premature abstraction over a second case that never arrives.
 
 A vendor chosen without checking the export path.
 
 ## Self-audit
 
-- The decision is classified as one way, two way, or hidden one way, in the first lines.
-- Three defensible options, each with what it makes hard later.
-- Operational burden is stated in ongoing hours or headcount.
-- Every external limit or price is retrieved with a date, or marked unverified.
+- The classification appears in the first two lines.
+- Option count matches the classification, and doing nothing has a row.
+- Operational burden is stated in ongoing hours or headcount for each option.
+- RPO and RTO are numbers from a named owner, or marked as missing.
+- Every external limit or price has a source and a retrieved date, or is marked unverified.
+- Every threshold is measured, cited, or labelled `ASSUMPTION:`.
 - The argument against the recommendation is present.
-- The threshold at which the recommendation changes is numeric where it can be.
-- The design is operable by the team that actually exists.
-- A decision record was written for anything one way.
+- Any design that writes to a store and publishes a message says how the two stay consistent.
+- Vendors holding data passed the exit checks in `references/exit-paths.md`, or the failure is stated.
+- The record went into the repository's existing decision directory, if one exists, and has a revisit trigger.
+
+## What this cannot do
+
+It cannot measure the user's system. Thresholds stay assumptions until someone runs the load test or
+reads the production metrics.
+
+It cannot read contracts it has not been given. Exit terms, data return clauses and termination fees
+need the actual agreement. Ask a commercial or technology contracts lawyer: "Under this agreement, what
+data do we get back on termination, in what format, within what period, at what cost, and what notice
+or fees apply if we leave before the term ends?"
+
+It cannot decide regulatory questions such as data residency. Ask a data protection lawyer: "Given
+personal data about users in these countries, stored with this provider in these regions, which
+transfer mechanisms or residency requirements apply to us?"
